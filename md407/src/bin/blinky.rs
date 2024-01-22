@@ -5,10 +5,7 @@
 
 use cortex_m::peripheral::SCB;
 use cortex_m_rt::pre_init;
-use panic_halt as _;
-//
-//
-use stm32f4xx_hal as hal;
+use md407 as _;
 
 
 #[pre_init]
@@ -24,7 +21,7 @@ unsafe fn startup() {
 )]
 mod app {
 
-    use super::hal;
+    use md407::hal as hal;
 
     use stm32f4xx_hal::gpio::{Pin, Output};
     use hal::pac::{USART1, TIM5};
@@ -74,6 +71,7 @@ mod app {
             &clocks,
         )
         .unwrap();
+        
         let systick = ctx.core.SYST;
         let mono = Systick::new(systick, 168_000_000);
         
@@ -102,12 +100,11 @@ mod app {
     #[task(local = [red_led], shared = [delay, usart])]
     fn toggle_red_led(mut ctx: toggle_red_led::Context) {
         ctx.shared.usart.lock(|usart| { 
-            writeln!(usart,"red started\r").unwrap();
+            writeln!(usart,"red started\r\0").unwrap();
         });
             
         ctx.local.red_led.toggle();
-            
-        
+             
         toggle_red_led::spawn_after((1 as u64).secs()).unwrap();
     }
 
@@ -117,7 +114,6 @@ mod app {
             writeln!(usart,"green started\r").unwrap();
         });
             
-
         ctx.local.green_led.toggle();
 
         toggle_green_led::spawn_after((1 as u64).secs()).unwrap();
