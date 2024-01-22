@@ -7,23 +7,15 @@ version = "0.1.0"
 [dependencies]
 cortex-m = { version = "0.7.6", features = ["critical-section-single-core"]}
 cortex-m-rt = "0.7"
-cortex-m-rtic = "1.0.0"
+cortex-m-rtic = {version = "1.1.4"}
 defmt = { version = "0.3", features = ["encoding-rzcobs"] }
 defmt-brtt = { version = "0.1", default-features = false, features = ["rtt"] }
 panic-probe = { version = "0.3", features = ["print-defmt"] }
-# TODO(4) Select the correct rtic backend
-#cortex-m-rtic = "1.0.0"
-# TODO(5) Add hal as dependency
-#nrf52840-hal = "0.16.0"
-# TODO add a monotonic if you use scheduling
-# rtic-monotonics = { version = "1.0.0", features = [ "cortex-m-systick" ]}
-#rp2040-hal = { version = "0.9.1", features = ["rt"]}
-#rp-pico = {version = "0.8.0"}
-stm32f4xx-hal = { version = "0.20", features = ["rtic1", "stm32f407"]}
+stm32f4xx-hal = { version = "0.20", features = ["defmt", "stm32f407"]}
 embedded-hal = "0.2.7"
 rtt-target = { version = "0.3.1", features = ["cortex-m"] }
+panic-halt = "0.2.0"
 
-#rp2040-monotonic = "1.2"
 
 # cargo build/run
 [profile.dev]

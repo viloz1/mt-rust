@@ -2,10 +2,9 @@
 #![no_std]
 #![feature(type_alias_impl_trait)]
 
+use panic_halt as _;
+use defmt_brtt as _; // global logger
 
-use test_app as _; // global logger + panicking-behavior + memory layout
-
-// TODO(7) Configure the `rtic::app` macro
 #[rtic::app(
     device = stm32f4xx_hal::pac,
     dispatchers = [USART1],
@@ -30,7 +29,6 @@ mod app {
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
-        defmt::info!("init");
         let mut p = ctx.device;
         let cp = ctx.core;
         let mut rcc = p.RCC.constrain();
