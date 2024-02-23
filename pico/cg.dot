@@ -1,0 +1,146 @@
+digraph {
+    node [fontname=monospace shape=box]
+    0 [label="main\nmax >= 220\nlocal = 8"]
+    1 [label="__nop\nmax = 0\nlocal = 0"]
+    2 [label="minimal::app::rtic_ext::main::__rtic_init_resources\nmax >= 212\nlocal = 16"]
+    3 [label="__cpsid\nmax = 0\nlocal = 0"]
+    4 [label="__cpsie\nmax = 0\nlocal = 0"]
+    5 [label="__primask_r\nmax = 0\nlocal = 0"]
+    6 [label="_defmt_release\nmax >= 196\nlocal = 32"]
+    7 [label="defmt::export::header\nmax >= 196\nlocal = 16"]
+    8 [label="_defmt_acquire\nmax >= 196\nlocal = 40"]
+    9 [label="i32 (ptr, ptr, i32)*\nmax = 92\nlocal = 0" style=dashed]
+    10 [label="core::slice::index::slice_start_index_len_fail\nmax >= 196\nlocal = 8"]
+    11 [label="core::panicking::panic_fmt\nmax >= 196\nlocal = 32"]
+    12 [label="rust_begin_unwind\nmax >= 196\nlocal = 56"]
+    13 [label="panic_probe::hard_fault\nmax = 16\nlocal = 8"]
+    14 [label="core::fmt::write\nmax >= 196\nlocal = 88"]
+    15 [label="_defmt_write\nmax >= 196\nlocal = 64"]
+    16 [label="_defmt_timestamp\nmax >= 196\nlocal = 16"]
+    17 [label="core::slice::index::slice_start_index_len_fail_rt\nmax >= 196\nlocal = 56"]
+    18 [label="defmt_brtt::rtt::Channel::nonblocking_write\nmax = 92\nlocal = 32"]
+    19 [label="defmt_brtt::rtt::Channel::blocking_write\nmax = 92\nlocal = 32"]
+    20 [label="__aeabi_memcpy\nmax = 60\nlocal = 8"]
+    21 [label="compiler_builtins::arm::__aeabi_memcpy\nmax = 52\nlocal = 8"]
+    22 [label="compiler_builtins::mem::memcpy\nmax = 44\nlocal = 44"]
+    23 [label="i1 (ptr, ptr)*\nmax >= 196\nlocal = 0" style=dashed]
+    24 [label="i1 (ptr, ptr, i32)*\nmax >= 196\nlocal = 0" style=dashed]
+    25 [label="<defmt::export::FmtWrite as core::fmt::Write>::write_str\nmax >= 196\nlocal = 8"]
+    26 [label="<&T as core::fmt::Display>::fmt::h624688886fcfd3c9\nmax >= 196\nlocal = 88"]
+    27 [label="core::fmt::Write::write_fmt\nmax >= 196\nlocal = 8"]
+    28 [label="<&T as core::fmt::Display>::fmt::h9baabd17f1a27d5b\nmax >= 196\nlocal = 8"]
+    29 [label="<&T as core::fmt::Display>::fmt::h84913bf2743dc98f\nmax >= 196\nlocal = 64"]
+    30 [label="core::ops::function::FnOnce::call_once\nmax = 0\nlocal = 0"]
+    31 [label="core::fmt::num::imp::<impl core::fmt::Display for u32>::fmt\nmax >= 196\nlocal = 8"]
+    32 [label="core::fmt::num::imp::fmt_u32\nmax >= 196\nlocal = 104"]
+    33 [label="i1 (ptr, i32)*\nmax >= 196\nlocal = 0" style=dashed]
+    34 [label="__aeabi_uidiv\nmax = 40\nlocal = 8"]
+    35 [label="core::fmt::Formatter::padding\nmax >= 196\nlocal = 32"]
+    36 [label="core::fmt::Formatter::pad_integral::write_prefix\nmax >= 196\nlocal = 24"]
+    37 [label="core::fmt::Write::write_char\nmax >= 196\nlocal = 16"]
+    38 [label="compiler_builtins::int::specialized_div_rem::u32_div_rem\nmax = 32\nlocal = 32"]
+    39 [label="i128 (ptr)*\nmax = 0\nlocal = 0" style=dashed]
+    40 [label="<T as core::any::Any>::type_id\nmax = 0\nlocal = 0"]
+    41 [label="cortex_m::asm::udf\nmax = 8\nlocal = 8"]
+    42 [label="__udf\nmax = 0\nlocal = 0"]
+    0 -> 1
+    0 -> 2
+    0 -> 3
+    2 -> 4
+    2 -> 3
+    2 -> 5
+    2 -> 6
+    2 -> 7
+    2 -> 8
+    8 -> 9
+    8 -> 10
+    8 -> 11
+    8 -> 3
+    8 -> 5
+    11 -> 12
+    12 -> 13
+    12 -> 6
+    12 -> 14
+    12 -> 15
+    12 -> 7
+    12 -> 8
+    12 -> 3
+    7 -> 16
+    7 -> 15
+    15 -> 9
+    15 -> 10
+    10 -> 17
+    17 -> 11
+    9 -> 18
+    9 -> 19
+    19 -> 20
+    20 -> 21
+    21 -> 22
+    18 -> 20
+    16 -> 15
+    14 -> 23
+    14 -> 24
+    24 -> 25
+    25 -> 15
+    23 -> 26
+    23 -> 27
+    23 -> 28
+    23 -> 29
+    23 -> 30
+    23 -> 31
+    31 -> 32
+    32 -> 33
+    32 -> 24
+    32 -> 34
+    32 -> 35
+    32 -> 36
+    36 -> 33
+    36 -> 24
+    33 -> 37
+    37 -> 15
+    35 -> 33
+    34 -> 38
+    29 -> 33
+    29 -> 24
+    29 -> 35
+    28 -> 23
+    27 -> 14
+    26 -> 39
+    26 -> 24
+    26 -> 14
+    39 -> 40
+    6 -> 9
+    6 -> 4
+    6 -> 10
+    13 -> 41
+    41 -> 42
+
+    subgraph cluster_0 {
+        style=dashed
+        fontname=monospace
+        label="SCC0"
+        8
+        10
+        17
+        11
+        12
+        6
+        14
+        23
+        26
+        24
+        25
+        15
+        27
+        28
+        29
+        33
+        37
+        35
+        31
+        32
+        36
+        7
+        16
+    }
+}

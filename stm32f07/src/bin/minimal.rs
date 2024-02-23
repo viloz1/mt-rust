@@ -15,8 +15,9 @@ use test_app as _; // global logger + panicking-behavior + memory layout
 mod app {
     use stm32f0xx_hal::delay::Delay;
     use stm32f0xx_hal::pac::{Interrupt, EXTI};
-    use stm32f0xx_hal::prelude::*; 
-
+    use stm32f0xx_hal::prelude::*;
+    use systick_monotonic::Systick; 
+    
     // Shared resources go here
     #[shared]
     struct Shared {
@@ -41,11 +42,13 @@ mod app {
         let syscfg = p.SYSCFG;
         let exti = p.EXTI;
         let button = gpioa.pa0;
-        
+
+                
         let delay = Delay::new(cp.SYST, &rcc);
         
-
+        
         cortex_m::interrupt::free(|cs| {
+
             button.into_pull_down_input(cs);
             syscfg.exticr1.modify(|_, w| unsafe { w.exti0().bits(1) });
 
