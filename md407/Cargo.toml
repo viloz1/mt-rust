@@ -13,6 +13,7 @@ rtt-target = { version = "0.5.0" }
 panic-halt = "0.2.0"
 cortex-m-semihosting = "0.5.0"
 systick-monotonic = "1.0.1"
+rand_core = "0.6.4"
 
 
 # cargo build/run

@@ -65,7 +65,7 @@ mod app {
         let green_led = gpiob.pb0.into_push_pull_output();
         // Create a delay abstraction based on SysTick
         let delay = dp.TIM5.delay_us(&clocks);
-
+        
         let swdio = gpioa.pa13;
         let swclk = gpioa.pa14;
 
@@ -125,8 +125,13 @@ mod app {
 
 
     #[task(local = [red_led], shared = [delay, usart])]
-    fn toggle_red_led(ctx: toggle_red_led::Context) {
+    fn toggle_red_led(mut ctx: toggle_red_led::Context) {
         ctx.local.red_led.toggle();
+        (ctx.shared.delay, ctx.shared.usart).lock(|delay, usart| {
+            writeln!(usart, "Before");
+            delay.delay_ms(1000);
+            writeln!(usart, "After");
+        });
              
         toggle_red_led::spawn_after((1 as u64).secs()).unwrap();
     }

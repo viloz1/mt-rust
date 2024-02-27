@@ -107,7 +107,7 @@ mod app {
 
 
         toggle_interrupt::spawn().ok();
-        background_task::spawn().ok();
+        background_task::spawn(0).ok();
         count_clock::spawn().ok();
 
         let timer = Time{seconds: 0, milliseconds: 0};
@@ -175,25 +175,25 @@ mod app {
 
     }
 
-    #[task(priority = 1, shared = [timer, rosc])]
-    fn background_task(mut ctx: background_task::Context) {
+    #[task(priority = 1, shared = [timer, rosc], capacity = 255)]
+    fn background_task(mut ctx: background_task::Context, task_id: u16) {
+        defmt::info!("New task: {}", task_id);
         let start = ctx.shared.timer.lock(|time| {
             return Time{seconds: time.seconds, milliseconds: time.milliseconds};
         });
         let (sleep_time, spawn_after) = ctx.shared.rosc.lock(|rosc| {
             return (get_random_byte(&rosc) % 10, get_random_byte(&rosc) % 10);
         });
-        defmt::info!("Sleep time: {}, spawn_after: {}", sleep_time, spawn_after);
         loop {
             let current_time = ctx.shared.timer.lock(|time| {
                 return Time{seconds: time.seconds, milliseconds: time.milliseconds};
             });
             if current_time.seconds - start.seconds > sleep_time.into() {
-                defmt::info!("Wake up!");
                 break;
             }
         }
-        let _ = background_task::spawn_after((spawn_after as u64).secs());
+        let _ = background_task::spawn(task_id + 1);
+        let _ = background_task::spawn_after((spawn_after as u64).secs(), task_id);
     }
 
 

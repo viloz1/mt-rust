@@ -13,10 +13,13 @@ use test_app as _; // global logger + panicking-behavior + memory layout
 
 )]
 mod app {
+    use stm32f0xx_hal::adc::Adc;
     use stm32f0xx_hal::delay::Delay;
+    use stm32f0xx_hal::gpio::Analog;
+    use stm32f0xx_hal::gpio::gpioa::PA1;
     use stm32f0xx_hal::pac::{Interrupt, EXTI};
     use stm32f0xx_hal::prelude::*;
-    use systick_monotonic::Systick; 
+    use test_app::{get_random_byte, get_random_u64}; 
     
     // Shared resources go here
     #[shared]
@@ -28,7 +31,9 @@ mod app {
     #[local]
     struct Local {
         button: EXTI,
-        delay: Delay
+        delay: Delay,
+        adc: Adc,
+        an_in: PA1<Analog> 
     }
 
     #[init]
@@ -43,11 +48,14 @@ mod app {
         let exti = p.EXTI;
         let button = gpioa.pa0;
 
+       
                 
         let delay = Delay::new(cp.SYST, &rcc);
-        
+        let adc = Adc::new(p.ADC, &mut rcc);
+        let mut an_in = None;
         
         cortex_m::interrupt::free(|cs| {
+            an_in = Some(gpioa.pa1.into_analog(cs));
 
             button.into_pull_down_input(cs);
             syscfg.exticr1.modify(|_, w| unsafe { w.exti0().bits(1) });
@@ -71,7 +79,9 @@ mod app {
             },
             Local {
                 button: exti,
-                delay
+                delay,
+                adc,
+                an_in: an_in.unwrap()
 
             },
             init::Monotonics()
@@ -81,9 +91,10 @@ mod app {
 
     // TODO: Add tasks
 
-    #[task(binds = EXTI0_1, local = [button, delay])]
+    #[task(binds = EXTI0_1, local = [button, delay, an_in, adc])]
     fn toggle_task(ctx: toggle_task::Context) {
-        defmt::info!("button pressed");
+        let a: u64 = get_random_u64(ctx.local.adc, ctx.local.an_in);
+        defmt::info!("button pressed: {}", a);
         cortex_m::interrupt::free(|_cs| { 
            ctx.local.button.pr.write(|w| w.pr0().set_bit()); 
         });
