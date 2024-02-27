@@ -20,48 +20,30 @@ unsafe fn startup() {
 
 )]
 mod app {
+    use fugit::{NanosDuration, NanosDurationU32, MicrosDurationU32};
     use hal::rng::Rng;
     use hal::timer::CounterUs;
     
     use hal::uart::{Serial, Event};
-    use md407::{hal as hal, get_random_byte};
+    use md407::{hal as hal, get_random_byte, setup_usart};
 
     use stm32f4xx_hal::gpio::{Pin, Output};
-    use hal::pac::{USART1, TIM5, TIM2};
-    use hal::{prelude::*};
+    use hal::pac::{USART1, TIM5, TIM2, TIM4};
+    use hal::prelude::*;
     use stm32f4xx_hal::timer::Delay;
     use stm32f4xx_hal::uart::Config;
     use systick_monotonic::*;
     use core::fmt::Write;
-    use core::ops::Sub;
 
-    #[derive(Clone)] 
-    pub struct Time {
-        seconds: u32,
-        micros: u32
-    }
-
-    impl Sub for Time {
-        type Output = Self;
-
-        fn sub(self, other: Self) -> Self::Output {
-            Self {
-                seconds: self.seconds - other.seconds,
-                micros: self.micros - other.micros,
-            }
-        }
-    }
 
     // Shared resources go here
     #[shared]
     struct Shared {
         // TODO: Add resources
-        delay: Delay<TIM5, 1000000>,
         usart: Serial<USART1>,
         rng: Rng,
-        time: Time,
-        start_time: Time,
-        button: Pin<'B', 7>
+        button: Pin<'B', 7>,
+        timer: CounterUs<TIM2>,
     }
 
     // Local resources go here
@@ -69,8 +51,8 @@ mod app {
     struct Local {
         red_led: Pin<'B', 1, Output>,
         green_led: Pin<'B', 0, Output>,
-        timer: CounterUs<TIM2>,
-        timer_skip: bool
+        test_timer: CounterUs<TIM5>,
+        background_tasks: u64,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -94,8 +76,6 @@ mod app {
         let mut syscfg = dp.SYSCFG.constrain();
         let mut exti = dp.EXTI;
         
-        let delay = dp.TIM5.delay_us(&clocks);
-
         let mut button = gpiob.pb7.into_pull_down_input();
         button.make_interrupt_source(&mut syscfg);
         button.trigger_on_edge(&mut exti, hal::gpio::Edge::Rising);
@@ -110,29 +90,27 @@ mod app {
         let rx_pin = gpioa.pa10.into_alternate();
         let usart1 = dp.USART1;
         
-        let mut serial = usart1.serial((tx_pin, rx_pin), Config::default()
-                .baudrate(115200.bps())
-                .wordlength_8()
-                .stopbits(hal::uart::config::StopBits::STOP1)
-                .parity_none(), &clocks).unwrap().with_u8_data();
-        serial.listen(Event::RxNotEmpty);
+        let mut serial = setup_usart(usart1, tx_pin, rx_pin, clocks);
         
         let systick = cp.SYST;
         let mono = Systick::new(systick, 168_000_000);
 
         let mut timer = dp.TIM2.counter(&clocks);
-        timer.start((1 as u32).micros()).ok();
+        timer.start((120 as u32).secs()).ok();
         timer.listen(hal::timer::Event::Update);
-        timer.wait().ok();
+
+        let mut test_timer = dp.TIM5.counter(&clocks);
+        test_timer.start((120 as u32).secs()).ok();
 
         unsafe {
             cortex_m::peripheral::NVIC::unmask(hal::interrupt::TIM2);
+            cortex_m::peripheral::NVIC::unmask(hal::interrupt::TIM4);
         }
         
         writeln!(serial, "\rwooooow lets gooo\r").unwrap();
         toggle_red_led::spawn().unwrap();
         issue_interrupt::spawn_after((5 as u64).secs()).ok();
-        background_task::spawn();
+        background_task::spawn().ok();
 
         let rng = dp.RNG.constrain(&clocks);
 
@@ -141,18 +119,15 @@ mod app {
         (
             Shared {
                 usart: serial,
-                delay,
                 rng,
-                time: Time {seconds: 0, micros: 0},
-                start_time: Time {seconds: 0, micros: 0},
-                button
+                button,
+                timer
             },
             Local {
                 red_led,
                 green_led,
-                timer,
-                timer_skip: true
-
+                test_timer,
+                background_tasks: 1
             },
             init::Monotonics(mono)
 
@@ -160,7 +135,7 @@ mod app {
     }
 
     // TODO: Add tasks
-    #[task(binds = USART1, local = [green_led], shared = [delay, usart])]
+    #[task(binds = USART1, local = [green_led], shared = [usart])]
     fn read_usart(mut ctx: read_usart::Context) {
         ctx.local.green_led.toggle();
         ctx.shared.usart.lock(|usart| {
@@ -172,91 +147,87 @@ mod app {
         }); 
     }
 
-
-
-
-    #[task(binds = TIM2, local=[timer, timer_skip], shared = [usart, time])]
-    fn timer_interrupt(mut ctx: timer_interrupt::Context) {
-        let current = *ctx.local.timer_skip;
-
-        if current {
-            *ctx.local.timer_skip = false;
-            return
-        } else {
-             *ctx.local.timer_skip = true;
-        }
-        let time = ctx.shared.time;
+    #[task(binds = TIM2, shared = [usart, timer])]
+    fn timer_interrupt(ctx: timer_interrupt::Context) {
         let usart = ctx.shared.usart;
-        (time, usart).lock(|time, usart| {
-            time.micros += 1;
-            if time.micros % 1_000_000 == 0 {
-                time.seconds += 1;
-                time.micros = 0;
-            } 
-            cortex_m::peripheral::NVIC::unpend(hal::interrupt::TIM2);
+        let timer = ctx.shared.timer;
 
+        (usart, timer).lock(|usart, timer| {
+            writeln!(usart, "Timer timeout!").ok();
+            timer.wait().ok();
         });
-        ctx.local.timer.wait().ok();
     }
 
-    #[task(priority = 1, shared = [time, rng], capacity = 250)]
+    #[task(priority = 1, shared = [rng, timer], capacity = 250)]
     fn background_task(mut ctx: background_task::Context) {
-        let start = ctx.shared.time.lock(|time| {
-            return Time{seconds: time.seconds, micros: time.micros};
+        let mut timer = ctx.shared.timer;
+
+        let start_time = timer.lock(|timer| {
+            return timer.now().ticks();
         });
-        let (sleep_time, spawn_after) = ctx.shared.rng.lock(|rng| {
+        let (sleep_time, spawn_after) = (ctx.shared.rng).lock(|rng| {
             return (get_random_byte(rng) % 10, get_random_byte(rng) % 10);
         });
+        let sleep_ticks = MicrosDurationU32::secs(sleep_time.into()).ticks();
         loop {
-            let current_time = ctx.shared.time.lock(|time| {
-                return Time{seconds: time.seconds, micros: time.micros};
+            let current_time = timer.lock(|timer| {
+                return timer.now().ticks();
             });
-            if current_time.seconds - start.seconds > sleep_time.into() {
+            if current_time - start_time > sleep_ticks  {
                 break;
             }
         }
         let _ = background_task::spawn_after((spawn_after as u64).secs());
     }
 
-    #[task(priority = 2, shared = [button, time, start_time])]
+    #[task(priority = 2, shared = [button, timer])]
     fn issue_interrupt(ctx: issue_interrupt::Context) {
         let button = ctx.shared.button;
-        let time = ctx.shared.time;
-        let start_time = ctx.shared.start_time;
-        (button, time, start_time).lock(|button, time, start_time| {
-            *start_time = time.clone();
+        let timer = ctx.shared.timer;
+
+        (button, timer).lock(|button, timer| {
+            timer.cancel().ok();
+            timer.start((120 as u32).secs()).ok();
+            timer.listen(hal::timer::Event::Update);
             cortex_m::peripheral::NVIC::pend(button.interrupt());
         });
-        issue_interrupt::spawn_after((5 as u64).secs());
+        issue_interrupt::spawn_after((5 as u64).secs()).ok();
     }
 
 
-    #[task(local = [red_led], shared = [delay, usart])]
-    fn toggle_red_led(ctx: toggle_red_led::Context) {
+    #[task(priority = 2, local = [red_led, test_timer], shared = [usart])]
+    fn toggle_red_led(mut ctx: toggle_red_led::Context) {
         ctx.local.red_led.toggle();
+
+        let time = MicrosDurationU32::from_ticks(ctx.local.test_timer.now().ticks());
+        let sleep_ticks = MicrosDurationU32::secs(4).ticks();
+
+        ctx.shared.usart.lock(|usart| {
+            //writeln!(usart,  "Nanos: {}, ticks: {}, Sleep: {}", time, ctx.local.test_timer.now().ticks(), sleep_ticks).ok();
+        });
+       
+        ctx.local.test_timer.cancel().ok();
+        ctx.local.test_timer.start((120 as u32).secs()).ok();
          
         toggle_red_led::spawn_after((1 as u64).secs()).unwrap();
     }
 
-    #[task(priority = 2, binds = EXTI9_5, shared = [start_time, button, time, usart])]
+    #[task(priority = 2, binds = EXTI9_5, shared = [timer, button, usart], local = [background_tasks])]
     fn button_interrupt(mut ctx: button_interrupt::Context) {
         let usart = ctx.shared.usart;
-        let start_time = ctx.shared.start_time;
+        let timer = ctx.shared.timer;
         
-        let current_time: Time = ctx.shared.time.lock(|time| {
-            time.clone()
-        });
 
-        (start_time, usart).lock(|start_time_mut, usart| {
-            let start_time: Time = start_time_mut.clone();
-            let passed_time = current_time - start_time;
-            writeln!(usart, "Passed time: {}s {}us", passed_time.seconds, passed_time.micros).ok();
+        (timer, usart).lock(|timer, usart| {
+            let dur =  MicrosDurationU32::from_ticks(timer.now().ticks());
+            writeln!(usart, "Passed time: {} us, Background tasks: {}", dur.to_micros(), ctx.local.background_tasks).ok();
         });
 
         ctx.shared.button.lock(|button| {
             button.clear_interrupt_pending_bit();
         });
-        background_task::spawn();
+        *ctx.local.background_tasks = *ctx.local.background_tasks + 1;
+        background_task::spawn().ok();
                
         
     }
