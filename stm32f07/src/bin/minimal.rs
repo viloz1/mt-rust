@@ -19,7 +19,7 @@ mod app {
     use stm32f0xx_hal::gpio::gpioa::PA1;
     use stm32f0xx_hal::pac::{Interrupt, EXTI};
     use stm32f0xx_hal::prelude::*;
-    use test_app::{get_random_byte, get_random_u64}; 
+    use test_app::{get_random_byte, get_random_u64, setup_tim2}; 
     
     // Shared resources go here
     #[shared]
@@ -48,8 +48,6 @@ mod app {
         let exti = p.EXTI;
         let button = gpioa.pa0;
 
-       
-                
         let delay = Delay::new(cp.SYST, &rcc);
         let adc = Adc::new(p.ADC, &mut rcc);
         let mut an_in = None;
