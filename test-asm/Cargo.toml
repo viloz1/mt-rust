@@ -1,0 +1,57 @@
+[package]
+# TODO fix `authors` and `name` if you didn't use `cargo-generate`
+name = "md407"
+edition = "2021"
+version = "0.1.0"
+
+[dependencies]
+cortex-m = { version = "0.7.6", features = ["critical-section-single-core"]}
+cortex-m-rt = "0.7"
+cortex-m-rtic = {version = "1.1.4"}
+stm32f4xx-hal = { version = "0.20", features = ["stm32f407"]}
+rtt-target = { version = "0.5.0" }
+panic-halt = "0.2.0"
+cortex-m-semihosting = "0.5.0"
+systick-monotonic = "1.0.1"
+rand_core = "0.6.4"
+fugit = "0.3.7"
+
+
+# cargo build/run
+[profile.dev]
+codegen-units = 1
+debug = 2
+debug-assertions = true # <-
+incremental = false
+opt-level = "s" # <-
+overflow-checks = true # <-
+
+# cargo test
+[profile.test]
+codegen-units = 1
+debug = 2
+debug-assertions = true # <-
+incremental = false
+opt-level = "s" # <-
+overflow-checks = true # <-
+
+# cargo build/run --release
+[profile.release]
+codegen-units = 1
+debug = 2
+debug-assertions = false # <-
+incremental = false
+lto = 'fat'
+opt-level = "s" # <-
+overflow-checks = false # <-
+
+# cargo test --release
+[profile.bench]
+codegen-units = 1
+debug = 2
+debug-assertions = false # <-
+incremental = false
+lto = 'fat'
+opt-level = "s" # <-
+overflow-checks = false # <-
+
