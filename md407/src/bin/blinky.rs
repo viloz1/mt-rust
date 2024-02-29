@@ -21,9 +21,6 @@ unsafe fn startup() {
 )]
 mod app {
 
-    use cortex_m::interrupt;
-    use hal::hal_02::blocking::serial::write;
-    use hal::pac::usart1::cr2::STOP_A;
     use hal::uart::{Serial, Event};
     use md407::hal as hal;
 
@@ -31,10 +28,10 @@ mod app {
     use hal::pac::{USART1, TIM5};
     use hal::prelude::*;
     use stm32f4xx_hal::timer::Delay;
-    use stm32f4xx_hal::uart::{Config, Tx};
+    use stm32f4xx_hal::uart::Config;
     use systick_monotonic::*;
     use core::fmt::Write;
-    use core::str::from_utf8;
+
     // Shared resources go here
     #[shared]
     struct Shared {
@@ -91,7 +88,7 @@ mod app {
         toggle_red_led::spawn().unwrap();
 
         if !serial.is_rx_not_empty() {
-            writeln!(serial, "hmm");
+            writeln!(serial, "hmm").ok();
         }
 
         (
@@ -115,9 +112,9 @@ mod app {
     fn read_usart(mut ctx: read_usart::Context) {
         ctx.local.green_led.toggle();
         ctx.shared.usart.lock(|usart| {
-            while (usart.is_rx_not_empty()) {
+            while usart.is_rx_not_empty() {
                 let input = usart.read();
-                writeln!(usart, "Input: {:?}", input);
+                writeln!(usart, "Input: {:?}", input).ok();
 
             }
         }); 
@@ -125,12 +122,12 @@ mod app {
 
 
     #[task(local = [red_led], shared = [delay, usart])]
-    fn toggle_red_led(mut ctx: toggle_red_led::Context) {
+    fn toggle_red_led(ctx: toggle_red_led::Context) {
         ctx.local.red_led.toggle();
         (ctx.shared.delay, ctx.shared.usart).lock(|delay, usart| {
-            writeln!(usart, "Before");
+            writeln!(usart, "Before").ok();
             delay.delay_ms(1000);
-            writeln!(usart, "After");
+            writeln!(usart, "After").ok();
         });
              
         toggle_red_led::spawn_after((1 as u64).secs()).unwrap();

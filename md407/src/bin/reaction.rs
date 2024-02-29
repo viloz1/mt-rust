@@ -20,18 +20,16 @@ unsafe fn startup() {
 
 )]
 mod app {
-    use fugit::{NanosDuration, NanosDurationU32, MicrosDurationU32};
+    use fugit::MicrosDurationU32;
     use hal::rng::Rng;
     use hal::timer::CounterUs;
     
-    use hal::uart::{Serial, Event};
+    use hal::uart::Serial;
     use md407::{hal as hal, get_random_byte, setup_usart};
 
     use stm32f4xx_hal::gpio::{Pin, Output};
-    use hal::pac::{USART1, TIM5, TIM2, TIM4};
+    use hal::pac::{USART1, TIM5, TIM2};
     use hal::prelude::*;
-    use stm32f4xx_hal::timer::Delay;
-    use stm32f4xx_hal::uart::Config;
     use systick_monotonic::*;
     use core::fmt::Write;
 
@@ -49,9 +47,6 @@ mod app {
     // Local resources go here
     #[local]
     struct Local {
-        red_led: Pin<'B', 1, Output>,
-        green_led: Pin<'B', 0, Output>,
-        test_timer: CounterUs<TIM5>,
         background_tasks: u64,
     }
 
@@ -66,10 +61,7 @@ mod app {
         let rcc = dp.RCC.constrain();
         let clocks = rcc.cfgr.require_pll48clk().sysclk(168.MHz()).pclk1(8.MHz()).use_hse(25.MHz()).freeze();
         let gpioa = dp.GPIOA.split();
-        
         let gpiob = dp.GPIOB.split();
-        let red_led = gpiob.pb1.into_push_pull_output();
-        let green_led = gpiob.pb0.into_push_pull_output();
         
        
         // Create a delay abstraction based on SysTick
@@ -99,8 +91,6 @@ mod app {
         timer.start((120 as u32).secs()).ok();
         timer.listen(hal::timer::Event::Update);
 
-        let mut test_timer = dp.TIM5.counter(&clocks);
-        test_timer.start((120 as u32).secs()).ok();
 
         unsafe {
             cortex_m::peripheral::NVIC::unmask(hal::interrupt::TIM2);
@@ -108,7 +98,6 @@ mod app {
         }
         
         writeln!(serial, "\rwooooow lets gooo\r").unwrap();
-        toggle_red_led::spawn().unwrap();
         issue_interrupt::spawn_after((5 as u64).secs()).ok();
         background_task::spawn().ok();
 
@@ -124,9 +113,6 @@ mod app {
                 timer
             },
             Local {
-                red_led,
-                green_led,
-                test_timer,
                 background_tasks: 1
             },
             init::Monotonics(mono)
@@ -134,18 +120,6 @@ mod app {
         )
     }
 
-    // TODO: Add tasks
-    #[task(binds = USART1, local = [green_led], shared = [usart])]
-    fn read_usart(mut ctx: read_usart::Context) {
-        ctx.local.green_led.toggle();
-        ctx.shared.usart.lock(|usart| {
-            while usart.is_rx_not_empty() {
-                let input = usart.read();
-                writeln!(usart, "Input: {:?}", input).ok();
-
-            }
-        }); 
-    }
 
     #[task(binds = TIM2, shared = [usart, timer])]
     fn timer_interrupt(ctx: timer_interrupt::Context) {
@@ -195,28 +169,10 @@ mod app {
     }
 
 
-    #[task(priority = 2, local = [red_led, test_timer], shared = [usart])]
-    fn toggle_red_led(mut ctx: toggle_red_led::Context) {
-        ctx.local.red_led.toggle();
-
-        let time = MicrosDurationU32::from_ticks(ctx.local.test_timer.now().ticks());
-        let sleep_ticks = MicrosDurationU32::secs(4).ticks();
-
-        ctx.shared.usart.lock(|usart| {
-            //writeln!(usart,  "Nanos: {}, ticks: {}, Sleep: {}", time, ctx.local.test_timer.now().ticks(), sleep_ticks).ok();
-        });
-       
-        ctx.local.test_timer.cancel().ok();
-        ctx.local.test_timer.start((120 as u32).secs()).ok();
-         
-        toggle_red_led::spawn_after((1 as u64).secs()).unwrap();
-    }
-
     #[task(priority = 2, binds = EXTI9_5, shared = [timer, button, usart], local = [background_tasks])]
     fn button_interrupt(mut ctx: button_interrupt::Context) {
         let usart = ctx.shared.usart;
         let timer = ctx.shared.timer;
-        
 
         (timer, usart).lock(|timer, usart| {
             let dur =  MicrosDurationU32::from_ticks(timer.now().ticks());
@@ -228,8 +184,6 @@ mod app {
         });
         *ctx.local.background_tasks = *ctx.local.background_tasks + 1;
         background_task::spawn().ok();
-               
-        
     }
 
 }

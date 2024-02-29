@@ -14,7 +14,7 @@ use test_app as _; // global logger + panicking-behavior + memory layout
 )]
 mod app {
 
-    use rp2040_hal::{clocks, Watchdog, pac::io_bank0::gpio, gpio::{Pin, FunctionSio, SioOutput}, gpio::bank0::Gpio25};
+    use rp2040_hal::{clocks, Watchdog, gpio::{Pin, FunctionSio, SioOutput}, gpio::bank0::Gpio25};
     use rp2040_monotonic::{Rp2040Monotonic, ExtU64};
     use rp_pico::XOSC_CRYSTAL_FREQ;
     use embedded_hal::digital::v2::OutputPin;
@@ -99,6 +99,6 @@ mod app {
 
         // Re-spawn this task after 1000 milliseconds
         let duration: u64 = 1000;
-        toggle_task::spawn_after(duration.millis());
+        toggle_task::spawn_after(duration.millis()).ok();
     }
 }

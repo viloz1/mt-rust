@@ -134,6 +134,7 @@ mod app {
 
     #[task(priority = 2, shared = [button, tim2, interrupt_start_time])]
     fn trigger_interrupt(mut ctx: trigger_interrupt::Context) {
+       defmt::info!("test"); 
         ctx.shared.button.lock(| button | {
             let start_time = ctx.shared.interrupt_start_time;
             let tim2 = ctx.shared.tim2;
@@ -150,7 +151,7 @@ mod app {
 
     }
 
-    #[task(priority = 1, local = [adc, an_in], shared = [tim2], capacity = 50)]
+    #[task(priority = 1, local = [adc, an_in], shared = [tim2], capacity = 10)]
     fn background_task(mut ctx: background_task::Context) {
         let start = ctx.shared.tim2.lock(|tim| {
             time_us(tim)

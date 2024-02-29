@@ -19,7 +19,7 @@ mod app {
     use rp_pico::XOSC_CRYSTAL_FREQ;
     use embedded_hal::digital::v2::OutputPin;
     use rp2040_hal::gpio::Interrupt::LevelHigh;
-    use test_app::{get_random_u16, get_random_byte, TimerRegs, PointerWrapper, time_us_64, CPU_PERIOD};
+    use test_app::{get_random_byte, TimerRegs, PointerWrapper, time_us_64, CPU_PERIOD};
 
     // Shared resources go here
     #[shared]
