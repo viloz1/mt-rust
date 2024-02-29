@@ -27,8 +27,8 @@ mod app {
     use hal::uart::Serial;
     use md407::{hal as hal, get_random_byte, setup_usart};
 
-    use stm32f4xx_hal::gpio::{Pin, Output};
-    use hal::pac::{USART1, TIM5, TIM2};
+    use stm32f4xx_hal::gpio::Pin;
+    use hal::pac::{USART1, TIM2};
     use hal::prelude::*;
     use systick_monotonic::*;
     use core::fmt::Write;
@@ -62,7 +62,6 @@ mod app {
         let clocks = rcc.cfgr.require_pll48clk().sysclk(168.MHz()).pclk1(8.MHz()).use_hse(25.MHz()).freeze();
         let gpioa = dp.GPIOA.split();
         let gpiob = dp.GPIOB.split();
-        
        
         // Create a delay abstraction based on SysTick
         let mut syscfg = dp.SYSCFG.constrain();
@@ -76,7 +75,6 @@ mod app {
         unsafe {
             cortex_m::peripheral::NVIC::unmask(button.interrupt());
         }
-
 
         let tx_pin = gpioa.pa9.into_alternate();
         let rx_pin = gpioa.pa10.into_alternate();
@@ -103,8 +101,6 @@ mod app {
 
         let rng = dp.RNG.constrain(&clocks);
 
-
-
         (
             Shared {
                 usart: serial,
@@ -119,7 +115,6 @@ mod app {
 
         )
     }
-
 
     #[task(binds = TIM2, shared = [usart, timer])]
     fn timer_interrupt(ctx: timer_interrupt::Context) {
@@ -168,7 +163,6 @@ mod app {
         issue_interrupt::spawn_after((5 as u64).secs()).ok();
     }
 
-
     #[task(priority = 2, binds = EXTI9_5, shared = [timer, button, usart], local = [background_tasks])]
     fn button_interrupt(mut ctx: button_interrupt::Context) {
         let usart = ctx.shared.usart;
@@ -185,6 +179,5 @@ mod app {
         *ctx.local.background_tasks = *ctx.local.background_tasks + 1;
         background_task::spawn().ok();
     }
-
 }
 
