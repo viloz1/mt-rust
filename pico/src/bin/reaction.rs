@@ -230,6 +230,7 @@ mod app {
             return (get_random_byte(&rosc) % 10, get_random_byte(&rosc) % 10);
         });
         defmt::info!("Sleep time: {}", sleep_time);
+
         loop {
             let current_time = ctx.shared.timer_regs.lock(|timer_regs| {
                 return time_us_64(timer_regs.hi.0, timer_regs.lo.0);
@@ -240,6 +241,4 @@ mod app {
         }
         let _ = background_task::spawn_after((spawn_after as u64).secs());
     }
-
-
 }
