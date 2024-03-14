@@ -4,6 +4,9 @@ name = "md407"
 edition = "2021"
 version = "0.1.0"
 
+[[bin]]
+name = "matrix"
+
 [dependencies]
 cortex-m = { version = "0.7.6", features = ["critical-section-single-core"]}
 cortex-m-rt = "0.7"

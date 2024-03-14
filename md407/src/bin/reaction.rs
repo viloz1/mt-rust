@@ -69,10 +69,6 @@ mod app {
         // Create a delay abstraction based on SysTick
         let mut syscfg = dp.SYSCFG.constrain();
         let mut exti = dp.EXTI;
-       
-        let test: [u32; 3] = [0; 3];
-        
-        let _a = test[8];
 
         let mut button = gpiob.pb7.into_pull_down_input();
         button.make_interrupt_source(&mut syscfg);
@@ -134,7 +130,7 @@ mod app {
 
                 rtic::export::wfi();
 
-                let end_time =ctx.shared.timer.lock(|tim| {
+                let end_time = ctx.shared.timer.lock(|tim| {
                     time_us_64(tim)
                 });
 

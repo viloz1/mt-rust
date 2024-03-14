@@ -6,13 +6,13 @@
 use test_app as _; // global logger + panicking-behavior + memory layout
 
 
-const SHARED_SIZE: usize = 2;
+const SHARED_SIZE: usize = 3;
 
-const A_MATRIX_ROWS: usize = 2;
+const A_MATRIX_ROWS: usize = 3;
 const A_MATRIX_COLUMNS: usize = SHARED_SIZE;
 
 const B_MATRIX_ROWS: usize = SHARED_SIZE;
-const B_MATRIX_COLUMNS: usize = 5;
+const B_MATRIX_COLUMNS: usize = 3;
 
 const RESULT_MATRIX_ROWS: usize = A_MATRIX_ROWS;
 const RESULT_MATRIX_COLUMNS: usize = B_MATRIX_COLUMNS;
@@ -24,15 +24,10 @@ const RESULT_MATRIX_COLUMNS: usize = B_MATRIX_COLUMNS;
 
 )]
 mod app {
-    use stm32f0xx_hal::adc::Adc;
-    use stm32f0xx_hal::gpio::Analog;
-    use stm32f0xx_hal::pac::{Interrupt, EXTI, TIM2};
+    use stm32f0xx_hal::pac::TIM2;
     use stm32f0xx_hal::prelude::*;
-    use systick_monotonic::{
-    fugit::ExtU32,
-    Systick,
-};
-    use test_app::{setup_tim2, SYSTICK_FREQ, time_us, get_random_byte};
+    use systick_monotonic::Systick;
+    use test_app::{setup_tim2, SYSTICK_FREQ, time_us};
     
     #[monotonic(binds = SysTick, default = true)]
     type Tonic = Systick<100>;
@@ -55,8 +50,6 @@ mod app {
     #[local]
     struct Local {
         last_timer_value: u64,
-        adc: Adc,
-        an_in: stm32f0xx_hal::gpio::gpioa::PA1<Analog>,
     }
 
     #[init]
@@ -67,21 +60,12 @@ mod app {
         p.RCC.apb1enr.modify(|_, w| w.tim2en().set_bit());
         p.RCC.apb1rstr.modify(|_, w| w.tim2rst().set_bit());
         p.RCC.apb1rstr.modify(|_, w| w.tim2rst().clear_bit());
-        let mut rcc = p.RCC.configure().sysclk(48.mhz()).freeze(&mut p.FLASH);
+        let rcc = p.RCC.configure().sysclk(48.mhz()).freeze(&mut p.FLASH);
         
-        let gpioa = p.GPIOA.split(&mut rcc);
-
         let tim2 = p.TIM2;
         setup_tim2(&tim2, &rcc.clocks, 2.mhz());
 
         let mono = Systick::new(cp.SYST, SYSTICK_FREQ);
-
-        let adc = Adc::new(p.ADC, &mut rcc);
-        let mut an_in = None;
-        
-        cortex_m::interrupt::free(|cs| {
-            an_in = Some(gpioa.pa1.into_analog(cs));
-        });
 
         let mut concurrent_tasks = 0;
 
@@ -96,14 +80,13 @@ mod app {
                 sleep_time: 0,
                 concurrent_tasks,
                 result_matrix: [0.0; crate::RESULT_MATRIX_ROWS * crate::RESULT_MATRIX_COLUMNS],
-                a_matrix: [1.0, 3.0, 12.3, 3.0],
-                b_matrix: [7.5, 4.6, 7.0, 9.0, 0.0, 32.3, 64.64, 1.0, 356.74, 3.0]
+                a_matrix: [8022.401392711306, 6269.699646497047, 5919.486621679387, 7680.534704603009, 5608.435969144818, 8685.173505108116, 8796.865635113609, 3887.08577452924, 5141.32977276882],
+                b_matrix: [8017.724296626506, 1515.4120723153633, 2041.0881516122372, 490.6566012387737, 1392.3503802878192, 6361.270938080724, 7399.567517801178, 1498.1163840916624, 6450.972180635455]
+
 
             },
             Local {
                 last_timer_value: 0,
-                adc,
-                an_in: an_in.unwrap(),
             },
             init::Monotonics(mono)
 
@@ -155,7 +138,7 @@ mod app {
         defmt::info!("CPU usage: {}", cpu_usage * 100 as f64);
     }
     
-    #[task(shared = [result_matrix, a_matrix, b_matrix, concurrent_tasks, tim2], capacity = 10)]
+    #[task(shared = [result_matrix, a_matrix, b_matrix, concurrent_tasks, tim2], capacity = 15)]
     fn task_i_row(mut ctx: task_i_row::Context, i: usize) {
        for j in 0..crate::RESULT_MATRIX_COLUMNS {
             let mut tmp: f64 = 0.0;
@@ -174,9 +157,10 @@ mod app {
         let tim = ctx.shared.tim2;
         (matrix, n_tasks, tim).lock(|matrix, n_tasks, tim2| {
             *n_tasks = *n_tasks - 1;
+
             if *n_tasks == 0 {
                 let end_time = time_us(tim2);
-                defmt::info!("Matrix: {}, end_time: {}", matrix, end_time);
+                defmt::info!("End_time: {}", end_time);
             }
         });
     }
