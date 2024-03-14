@@ -52,3 +52,5 @@ pub fn setup_usart(usart: USART1, tx_pin: Pin<'A',9, Alternate<7>> , rx_pin:  Pi
 pub fn time_us_64(tim2: &CounterUs<TIM2>) -> u64 {
     MicrosDurationU32::from_ticks(tim2.now().ticks()).to_micros().into()
 }
+
+

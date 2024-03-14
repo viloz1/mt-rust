@@ -2,9 +2,7 @@
 #![no_std]
 #![feature(type_alias_impl_trait)]
 
-
 use test_app as _; // global logger + panicking-behavior + memory layout
-
 
 const SHARED_SIZE: usize = 3;
 

@@ -14,13 +14,13 @@ use test_app as _; // global logger + panicking-behavior + memory layout
 )]
 mod app {
 
-    use rp2040_hal::{clocks, gpio::{bank0::Gpio25, bank0::Gpio26, FunctionSio, Pin, SioOutput}, Watchdog, rosc::{RingOscillator, Enabled}};
+    use rp2040_hal::{clocks, gpio::{bank0::{Gpio25, Gpio26}, FunctionSio, Pin, SioOutput}, rosc::{Enabled, RingOscillator}, uart::{DataBits, StopBits, UartConfig}, Watchdog};
     use rp2040_monotonic::{Rp2040Monotonic, ExtU64};
     use rp_pico::XOSC_CRYSTAL_FREQ;
     use embedded_hal::digital::v2::OutputPin;
     use rp2040_hal::gpio::Interrupt::LevelHigh;
     use test_app::{get_random_byte, TimerRegs, PointerWrapper, time_us_64, CPU_PERIOD};
-
+    
     // Shared resources go here
     #[shared]
     struct Shared {
@@ -54,7 +54,7 @@ mod app {
         let mut watchdog = Watchdog::new(pac.WATCHDOG);
 
         // Configure the clocks
-        let _clocks = clocks::init_clocks_and_plls(
+        let clocks = clocks::init_clocks_and_plls(
             XOSC_CRYSTAL_FREQ,
             pac.XOSC,
             pac.CLOCKS,
@@ -66,6 +66,7 @@ mod app {
         .ok()
         .unwrap();
 
+        
         let rosc = rp2040_hal::rosc::RingOscillator::new(pac.ROSC);
         
                // The single-cycle I/O block controls our GPIO pins
