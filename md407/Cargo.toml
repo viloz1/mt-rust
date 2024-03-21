@@ -16,6 +16,7 @@ panic-halt = "0.2.0"
 systick-monotonic = "1.0.1"
 rand_core = "0.6.4"
 fugit = "0.3.7"
+cortex-m-rt = "0.7.3"
 
 
 # cargo build/run

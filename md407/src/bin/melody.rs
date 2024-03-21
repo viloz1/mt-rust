@@ -25,12 +25,17 @@ mod app {
 
     use hal::dac::DacOut;
     use hal::dac::DacPin;
+    use hal::dac::Pins;
+    use hal::gpio::Analog;
+    use hal::gpio::PA4;
+    use hal::gpio::PA5;
+    use hal::rcc::{Enable, Reset};
+    use hal::pac::DAC;
     use md407::hal as hal;
 
     use stm32f4xx_hal::gpio::{Pin, Output};
-    use hal::pac::{USART1, TIM5};
+    use hal::pac::USART1;
     use hal::prelude::*;
-    use stm32f4xx_hal::timer::Delay;
     use stm32f4xx_hal::uart::{Config, Tx};
     use systick_monotonic::*;
     use core::fmt::Write;
@@ -46,7 +51,7 @@ mod app {
     struct Local {
         red_led: Pin<'B', 1, Output>,
         green_led: Pin<'B', 0, Output>,
-        dac: hal::dac::C2
+        peak: bool
 
     }
 
@@ -64,14 +69,34 @@ mod app {
 
 
 
-        let gpioa = dp.GPIOA.split();
         let gpiob = dp.GPIOB.split();
+        let gpioa = dp.GPIOA.split();
         let red_led = gpiob.pb1.into_push_pull_output();
         let green_led = gpiob.pb0.into_push_pull_output();
 
-        let pa5 = gpioa.pa5.into_analog();
-        let mut dac: hal::dac::C2 = dp.DAC.constrain(pa5);
-        dac.enable();
+        unsafe{DAC::enable_unchecked(); DAC::reset_unchecked()};
+
+        let pa5: PA5<Analog> = gpioa.pa5.into_analog();
+        PA5::init();
+
+        //Enable buffer
+        dp.DAC.cr.modify(|_, w| w.boff2().set_bit());
+
+        //Disable DAC trigger
+        dp.DAC.cr.modify(|_, w| w.ten2().clear_bit());
+
+        //Disable wave generation
+        dp.DAC.cr.modify(|_, w| w.wave2().disabled());
+        
+        //Send enable command
+        dp.DAC.cr.modify(|_, w| w.dmaen2().set_bit());
+
+        dp.DAC.dhr8r2.modify(|_, w| w.dacc2dhr().bits(0));
+
+
+    
+
+        dp.DAC.cr.modify(|_, w| w.en2().set_bit()); 
         
 
         let tx_pin = gpiob.pb6.into_alternate();
@@ -104,7 +129,7 @@ mod app {
             Local {
               red_led,
               green_led,
-              dac
+                peak: false
 
             },
             init::Monotonics(mono)
@@ -136,17 +161,18 @@ mod app {
 
     // TODO: Add tasks
      
-    #[task(local = [dac], shared = [usart])]
+    #[task(local = [peak], shared = [usart])]
     fn generate_sound(ctx: generate_sound::Context) {
         
-        let dac = ctx.local.dac;
         
-        let current = dac.get_value();
-        if current > 0 {
-            
-            dac.set_value(7);
+        if *ctx.local.peak {
+            let dac = unsafe { &(*DAC::ptr()) };
+            dac.dhr8r2.write(|w| unsafe { w.bits(15 as u32) });
+            *ctx.local.peak = false;
         } else {
-            dac.set_value(0);
+            let dac = unsafe { &(*DAC::ptr()) };
+            dac.dhr8r2.write(|w| unsafe { w.bits(0 as u32) });
+            *ctx.local.peak = true;
         }
 
         generate_sound::spawn_after((803 as u64).micros()).unwrap();
