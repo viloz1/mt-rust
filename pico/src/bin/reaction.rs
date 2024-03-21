@@ -14,13 +14,13 @@ use test_app as _; // global logger + panicking-behavior + memory layout
 )]
 mod app {
 
-    use rp2040_hal::{clocks, gpio::{bank0::Gpio25, bank0::Gpio26, FunctionSio, Pin, SioOutput}, Watchdog, rosc::{RingOscillator, Enabled}};
+    use rp2040_hal::{clocks, gpio::{bank0::{Gpio25, Gpio26}, FunctionSio, Pin, SioOutput}, rosc::{Enabled, RingOscillator}, Watchdog};
     use rp2040_monotonic::{Rp2040Monotonic, ExtU64};
     use rp_pico::XOSC_CRYSTAL_FREQ;
     use embedded_hal::digital::v2::OutputPin;
     use rp2040_hal::gpio::Interrupt::LevelHigh;
     use test_app::{get_random_byte, TimerRegs, PointerWrapper, time_us_64, CPU_PERIOD};
-
+    
     // Shared resources go here
     #[shared]
     struct Shared {
@@ -66,6 +66,7 @@ mod app {
         .ok()
         .unwrap();
 
+        
         let rosc = rp2040_hal::rosc::RingOscillator::new(pac.ROSC);
         
                // The single-cycle I/O block controls our GPIO pins
@@ -230,6 +231,7 @@ mod app {
             return (get_random_byte(&rosc) % 10, get_random_byte(&rosc) % 10);
         });
         defmt::info!("Sleep time: {}", sleep_time);
+
         loop {
             let current_time = ctx.shared.timer_regs.lock(|timer_regs| {
                 return time_us_64(timer_regs.hi.0, timer_regs.lo.0);
@@ -240,6 +242,4 @@ mod app {
         }
         let _ = background_task::spawn_after((spawn_after as u64).secs());
     }
-
-
 }

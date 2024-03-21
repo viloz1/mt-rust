@@ -1,7 +1,8 @@
 #![no_main]
 #![no_std]
 
-use hal::{rng::Rng, gpio::{Alternate, Pin}, pac::USART1, uart::{Serial, Config, Event}, rcc::Clocks, serial::SerialExt, Listen};
+use fugit::MicrosDurationU32;
+use hal::{rng::Rng, gpio::{Alternate, Pin}, pac::{USART1, TIM2}, uart::{Serial, Config, Event}, rcc::Clocks, serial::SerialExt, Listen, timer::CounterUs};
 use rand_core::RngCore;
 use panic_halt as _;
 pub use stm32f4xx_hal as hal; // memory layout
@@ -10,7 +11,6 @@ use stm32f4xx_hal::time::U32Ext;
 /// Terminates the application and makes `probe-rs` exit with exit-code = 0
 pub fn exit() -> ! {
     loop {
-        cortex_m::asm::bkpt();
     }
 }
 
@@ -47,4 +47,9 @@ pub fn setup_usart(usart: USART1, tx_pin: Pin<'A',9, Alternate<7>> , rx_pin:  Pi
     serial.listen(Event::RxNotEmpty);
     serial
 }
+
+pub fn time_us_64(tim2: &CounterUs<TIM2>) -> u64 {
+    MicrosDurationU32::from_ticks(tim2.now().ticks()).to_micros().into()
+}
+
 

@@ -2,7 +2,6 @@
 #![no_std]
 #![feature(type_alias_impl_trait)]
 
-
 use test_app as _; // global logger + panicking-behavior + memory layout
 
 // TODO(7) Configure the `rtic::app` macro
@@ -14,10 +13,15 @@ use test_app as _; // global logger + panicking-behavior + memory layout
 )]
 mod app {
 
-    use rp2040_hal::{clocks, Watchdog, gpio::{Pin, FunctionSio, SioOutput}, gpio::bank0::Gpio25};
-    use rp2040_monotonic::{Rp2040Monotonic, ExtU64};
-    use rp_pico::XOSC_CRYSTAL_FREQ;
     use embedded_hal::digital::v2::OutputPin;
+    use rp2040_hal::{
+        clocks,
+        gpio::bank0::Gpio25,
+        gpio::{FunctionSio, Pin, SioOutput},
+        Watchdog,
+    };
+    use rp2040_monotonic::{ExtU64, Rp2040Monotonic};
+    use rp_pico::XOSC_CRYSTAL_FREQ;
 
     // Shared resources go here
     #[shared]
@@ -38,7 +42,7 @@ mod app {
     #[init]
     fn init(mut ctx: init::Context) -> (Shared, Local, init::Monotonics) {
         defmt::info!("init");
-        
+
         // Setup the clock. This is required.
         let mut watchdog = Watchdog::new(ctx.device.WATCHDOG);
         let _clocks = clocks::init_clocks_and_plls(
@@ -76,15 +80,14 @@ mod app {
             },
             Local {
                 led_pin,
-                led_state: false
+                led_state: false,
             },
-            init::Monotonics(mono)
-
+            init::Monotonics(mono),
         )
     }
 
     // TODO: Add tasks
-// Toggle the led based on a local state
+    // Toggle the led based on a local state
     #[task(local = [led_state, led_pin])]
     fn toggle_task(ctx: toggle_task::Context) {
         if *ctx.local.led_state {
