@@ -3,15 +3,7 @@
 #![feature(type_alias_impl_trait)]
 
 
-use cortex_m::peripheral::SCB;
-use cortex_m_rt::pre_init;
 use md407 as _;
-
-
-#[pre_init]
-unsafe fn startup() {
-    (*SCB::PTR).ccr.modify(|r| r & !(1 << 3));
-}
 
 #[rtic::app(
     device = stm32f4xx_hal::pac,
@@ -20,7 +12,6 @@ unsafe fn startup() {
 
 )]
 mod app {
-    use fugit::MicrosDurationU32;
     use hal::rng::Rng;
     use hal::timer::CounterUs;
     

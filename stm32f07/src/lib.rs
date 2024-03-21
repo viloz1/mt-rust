@@ -42,7 +42,7 @@ pub fn get_random_byte(adc: &mut Adc, in_pin: &mut PA1<Analog>) -> u8 {
             result += 1 << (7 - i)
         }
     }
-    return result;
+    result
 }
 
 pub fn get_random_u16(adc: &mut Adc, in_pin: &mut PA1<Analog>) -> u16 {
@@ -50,7 +50,7 @@ pub fn get_random_u16(adc: &mut Adc, in_pin: &mut PA1<Analog>) -> u16 {
     for i in 0..2 {
         array[i] = get_random_byte(adc, in_pin);    
     }
-    return u16::from_le_bytes(array)
+    u16::from_le_bytes(array)
 }
 
 pub fn get_random_u32(adc: &mut Adc, in_pin: &mut PA1<Analog>) -> u32 {
@@ -58,7 +58,7 @@ pub fn get_random_u32(adc: &mut Adc, in_pin: &mut PA1<Analog>) -> u32 {
     for i in 0..4 {
         array[i] = get_random_byte(adc, in_pin);    
     }
-    return u32::from_le_bytes(array)
+    u32::from_le_bytes(array)
 }
 
 pub fn get_random_u64(adc: &mut Adc, in_pin: &mut PA1<Analog>) -> u64 {
@@ -66,7 +66,7 @@ pub fn get_random_u64(adc: &mut Adc, in_pin: &mut PA1<Analog>) -> u64 {
     for i in 0..8 {
         array[i] = get_random_byte(adc, in_pin);    
     }
-    return u64::from_le_bytes(array)
+    u64::from_le_bytes(array)
 }
 
 pub fn setup_tim2<T>(tim2: &TIM2, clocks: &Clocks, timeout: T) where T: Into<Hertz> {

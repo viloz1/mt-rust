@@ -9,12 +9,10 @@ name = "matrix"
 
 [dependencies]
 cortex-m = { version = "0.7.6", features = ["critical-section-single-core"]}
-cortex-m-rt = "0.7"
 cortex-m-rtic = {version = "1.1.4"}
 stm32f4xx-hal = { version = "0.20", features = ["stm32f407"]}
 rtt-target = { version = "0.5.0" }
 panic-halt = "0.2.0"
-cortex-m-semihosting = "0.5.0"
 systick-monotonic = "1.0.1"
 rand_core = "0.6.4"
 fugit = "0.3.7"

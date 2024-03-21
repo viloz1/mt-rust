@@ -153,7 +153,7 @@ mod app {
         let matrix = ctx.shared.result_matrix;
         let n_tasks = ctx.shared.concurrent_tasks;
         let tim = ctx.shared.tim2;
-        (matrix, n_tasks, tim).lock(|matrix, n_tasks, tim2| {
+        (n_tasks, tim).lock(|n_tasks, tim2| {
             *n_tasks = *n_tasks - 1;
 
             if *n_tasks == 0 {

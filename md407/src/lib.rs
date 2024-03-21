@@ -11,7 +11,6 @@ use stm32f4xx_hal::time::U32Ext;
 /// Terminates the application and makes `probe-rs` exit with exit-code = 0
 pub fn exit() -> ! {
     loop {
-        cortex_m::asm::bkpt();
     }
 }
 

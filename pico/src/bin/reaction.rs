@@ -14,7 +14,7 @@ use test_app as _; // global logger + panicking-behavior + memory layout
 )]
 mod app {
 
-    use rp2040_hal::{clocks, gpio::{bank0::{Gpio25, Gpio26}, FunctionSio, Pin, SioOutput}, rosc::{Enabled, RingOscillator}, uart::{DataBits, StopBits, UartConfig}, Watchdog};
+    use rp2040_hal::{clocks, gpio::{bank0::{Gpio25, Gpio26}, FunctionSio, Pin, SioOutput}, rosc::{Enabled, RingOscillator}, Watchdog};
     use rp2040_monotonic::{Rp2040Monotonic, ExtU64};
     use rp_pico::XOSC_CRYSTAL_FREQ;
     use embedded_hal::digital::v2::OutputPin;
@@ -54,7 +54,7 @@ mod app {
         let mut watchdog = Watchdog::new(pac.WATCHDOG);
 
         // Configure the clocks
-        let clocks = clocks::init_clocks_and_plls(
+        let _clocks = clocks::init_clocks_and_plls(
             XOSC_CRYSTAL_FREQ,
             pac.XOSC,
             pac.CLOCKS,
