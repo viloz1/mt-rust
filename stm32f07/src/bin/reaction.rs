@@ -36,6 +36,7 @@ mod app {
         interrupt_start_time: u64
     }
 
+
     // Local resources go here
     #[local]
     struct Local {

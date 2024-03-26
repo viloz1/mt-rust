@@ -1,184 +1,151 @@
 #![no_main]
 #![no_std]
 #![feature(type_alias_impl_trait)]
-
-
-use cortex_m::peripheral::SCB;
+#![feature(exposed_provenance)]
+#![feature(const_trait_impl)]
+#![feature(effects)]
 use cortex_m_rt::pre_init;
 use md407 as _;
-use stm32f4xx_hal::{pac::RCC, rcc};
+use stm32f4xx_hal::pac::SCB;
 
+const TONE_PERIOD_US: u64 = 2024;
+const NEW_TASK_INTERVAL_MS: u64 = 500;
+const BACKGROUND_TASK_SLEEP_US: u64 = 1;
+const BACKGROUND_PERIOD_US: u64 = 500;
 
-#[pre_init]
+#[pre_init()]
 unsafe fn startup() {
     (*SCB::PTR).ccr.modify(|r| r & !(1 << 3));
-    (*RCC::PTR).apb1enr.modify(|_, w| w.dacen().set_bit());
+    //(*RCC::PTR).apb1enr.modify(|_, w| w.dacen().set_bit());
 }
-
 #[rtic::app(
     device = stm32f4xx_hal::pac,
-    dispatchers = [EXTI4],
+    dispatchers = [EXTI4, EXTI3, USART3, USART6],
     peripherals = true
 
 )]
 mod app {
-
-    use hal::dac::DacOut;
-    use hal::dac::DacPin;
-    use hal::dac::Pins;
-    use hal::gpio::Analog;
-    use hal::gpio::PA4;
-    use hal::gpio::PA5;
-    use hal::rcc::{Enable, Reset};
-    use hal::pac::DAC;
-    use md407::hal as hal;
-
-    use stm32f4xx_hal::gpio::{Pin, Output};
-    use hal::pac::USART1;
-    use hal::prelude::*;
-    use stm32f4xx_hal::uart::{Config, Tx};
-    use systick_monotonic::*;
     use core::fmt::Write;
+    use hal::dac::DacPin;
+    use hal::pac::{DAC, TIM2, USART1};
+    use hal::prelude::*;
+    use hal::timer::CounterUs;
+    use hal::uart::Serial;
+    use md407::{hal, setup_usart, time_us_64};
+    use systick_monotonic::*;
+
+    use crate::{BACKGROUND_TASK_SLEEP_US, NEW_TASK_INTERVAL_MS, TONE_PERIOD_US};
+
     // Shared resources go here
     #[shared]
     struct Shared {
-
-        usart: Tx<USART1>,
+        usart: Serial<USART1>,
+        timer: CounterUs<TIM2>,
     }
 
     // Local resources go here
     #[local]
     struct Local {
-        red_led: Pin<'B', 1, Output>,
-        green_led: Pin<'B', 0, Output>,
-        peak: bool
-
+        dac: hal::dac::C2,
+        peak: bool,
     }
 
     #[monotonic(binds = SysTick, default = true)]
-    type MyMono = Systick<100>; // 100 Hz / 10 ms granularity
+    type MyMono = Systick<100000>; // 100 000 Hz / 1 us granularity
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
         let dp = ctx.device;
         let rcc_uninit = dp.RCC;
-        
+
+        rcc_uninit.apb1enr.modify(|_, w| w.dacen().enabled());
+        rcc_uninit.ahb1enr.modify(|_, w| w.gpioaen().enabled());
 
         let rcc: hal::rcc::Rcc = rcc_uninit.constrain();
         let clocks = rcc.cfgr.sysclk(168.MHz()).pclk1(8.MHz()).freeze();
 
-
-
-        let gpiob = dp.GPIOB.split();
         let gpioa = dp.GPIOA.split();
-        let red_led = gpiob.pb1.into_push_pull_output();
-        let green_led = gpiob.pb0.into_push_pull_output();
 
-        unsafe{DAC::enable_unchecked(); DAC::reset_unchecked()};
-
-        let pa5: PA5<Analog> = gpioa.pa5.into_analog();
-        PA5::init();
+        let pa5 = gpioa.pa5.into_analog();
 
         //Enable buffer
-        dp.DAC.cr.modify(|_, w| w.boff2().set_bit());
+        dp.DAC.cr.modify(|_, w| w.boff2().enabled());
 
         //Disable DAC trigger
-        dp.DAC.cr.modify(|_, w| w.ten2().clear_bit());
+        dp.DAC.cr.modify(|_, w| w.ten2().disabled());
 
-        //Disable wave generation
+        //Disable wave generati on
         dp.DAC.cr.modify(|_, w| w.wave2().disabled());
-        
+
         //Send enable command
-        dp.DAC.cr.modify(|_, w| w.dmaen2().set_bit());
+        dp.DAC.cr.modify(|_, w| w.en2().enabled());
 
-        dp.DAC.dhr8r2.modify(|_, w| w.dacc2dhr().bits(0));
+        dp.DAC.dhr8r2.modify(|_, w| unsafe { w.bits(0) });
+        let mut dac: hal::dac::C2 = dp.DAC.constrain(pa5);
+        dac.enable();
 
+        let tx_pin = gpioa.pa9.into_alternate();
+        let rx_pin = gpioa.pa10.into_alternate();
+        let usart1 = dp.USART1;
 
-    
+        let mut serial = setup_usart(usart1, tx_pin, rx_pin, clocks);
+        background_task::spawn().ok();
+        inc_task::spawn().ok();
 
-        dp.DAC.cr.modify(|_, w| w.en2().set_bit()); 
-        
+        let mut timer = dp.TIM2.counter(&clocks);
+        timer.start((300 as u32).secs()).ok();
 
-        let tx_pin = gpiob.pb6.into_alternate();
-            let mut tx = dp
-            .USART1
-            .tx(
-                tx_pin,
-                Config::default()
-                    .baudrate(115200.bps())
-                    .wordlength_8()
-                    .parity_none(),
-                &clocks,
-            )
-            .unwrap();
-        
         let systick = ctx.core.SYST;
         let mono = Systick::new(systick, 168_000_000);
-        
-        writeln!(tx, "\rwooooow lets gooo\r").unwrap();
-        toggle_red_led::spawn().unwrap();
-        toggle_green_led::spawn_after((1 as u64).secs()).unwrap();
+
+        writeln!(serial, "\rwooooow lets gooo\r").unwrap();
         generate_sound::spawn().unwrap();
 
         (
             Shared {
-                usart: tx,
-              
-                // Initialization of shared resources go here
+                usart: serial,
+                timer, // Initialization of shared resources go here
             },
-            Local {
-              red_led,
-              green_led,
-                peak: false
-
-            },
-            init::Monotonics(mono)
-
+            Local { dac, peak: false },
+            init::Monotonics(mono),
         )
     }
 
-    #[task(local = [red_led], shared = [usart])]
-    fn toggle_red_led(mut ctx: toggle_red_led::Context) {
-        ctx.shared.usart.lock(|usart| { 
-            writeln!(usart,"red started\r\0").unwrap();
-        });
-            
-        ctx.local.red_led.toggle();
-             
-        toggle_red_led::spawn_after((1 as u64).secs()).unwrap();
-    }
-
-    #[task(local = [green_led], shared = [usart])]
-    fn toggle_green_led(mut ctx: toggle_green_led::Context) {
-        ctx.shared.usart.lock(|usart| { 
-            writeln!(usart,"green started\r").unwrap();
-        });
-            
-        ctx.local.green_led.toggle();
-
-        toggle_green_led::spawn_after((1 as u64).secs()).unwrap();
-    }
-
-    // TODO: Add tasks
-     
-    #[task(local = [peak], shared = [usart])]
+    #[task(local = [dac, peak], shared = [usart], priority = 2)]
     fn generate_sound(ctx: generate_sound::Context) {
-        
-        
-        if *ctx.local.peak {
-            let dac = unsafe { &(*DAC::ptr()) };
-            dac.dhr8r2.write(|w| unsafe { w.bits(15 as u32) });
-            *ctx.local.peak = false;
+        generate_sound::spawn_after((2024 as u64).micros()).unwrap();
+        let peak = ctx.local.peak;
+
+        if *peak {
+            let dac2 = unsafe { &(*DAC::ptr()) };
+            dac2.dhr8r2.write(|w| unsafe { w.bits(20) });
+            *peak = false;
         } else {
-            let dac = unsafe { &(*DAC::ptr()) };
-            dac.dhr8r2.write(|w| unsafe { w.bits(0 as u32) });
-            *ctx.local.peak = true;
+            let dac2 = unsafe { &(*DAC::ptr()) };
+            dac2.dhr8r2.write(|w| unsafe { w.bits(0) });
+            *peak = true;
         }
-
-        generate_sound::spawn_after((803 as u64).micros()).unwrap();
-             
     }
-    
 
+    #[task(priority = 1)]
+    fn inc_task(_ctx: inc_task::Context) {
+        inc_task::spawn_after((NEW_TASK_INTERVAL_MS).millis()).ok();
+        background_task::spawn().ok();
+    }
 
+    #[task(shared = [timer], capacity = 200, priority = 1)]
+    fn background_task(mut ctx: background_task::Context) {
+        let period = (500 as u64).micros();
+        let end_time = ctx
+            .shared
+            .timer
+            .lock(|tim| time_us_64(tim) + 1);
+        loop {
+            let current_time = ctx.shared.timer.lock(|tim| time_us_64(tim));
+            if current_time > end_time {
+                break;
+            }
+        }
+        background_task::spawn_after(period).unwrap();
+    }
 }

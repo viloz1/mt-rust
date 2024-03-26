@@ -19,7 +19,7 @@ mod app {
     use md407::{hal as hal, get_random_byte, setup_usart, time_us_64};
 
     use stm32f4xx_hal::gpio::Pin;
-    use hal::pac::{USART1, TIM2};
+    use hal::pac::{DAC, TIM2, USART1};
     use hal::prelude::*;
     use systick_monotonic::*;
     use core::fmt::Write;
@@ -41,7 +41,8 @@ mod app {
     #[local]
     struct Local {
         background_tasks: u64,
-        last_timer_value: u64
+        last_timer_value: u64,
+        dac: hal::dac::C2
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -82,6 +83,20 @@ mod app {
         let mut timer = dp.TIM2.counter(&clocks);
         timer.start((300 as u32).secs()).ok();
 
+        let pa5 = gpioa.pa5.into_analog();
+        dp.DAC.cr.modify(|_, w| w.boff2().set_bit());
+
+        //Disable DAC trigger
+        dp.DAC.cr.modify(|_, w| w.ten2().clear_bit());
+
+        //Disable wave generation
+        dp.DAC.cr.modify(|_, w| w.wave2().disabled());
+        
+        //Send enable command
+
+        dp.DAC.dhr8r2.modify(|_, w| unsafe{w.bits(0)});
+        let mut dac: hal::dac::C2 = dp.DAC.constrain(pa5);
+        hal::dac::DacPin::enable(&mut dac);
 
         unsafe {
             cortex_m::peripheral::NVIC::unmask(hal::interrupt::TIM2);
@@ -90,6 +105,7 @@ mod app {
         
         writeln!(serial, "\rwooooow lets gooo\r").unwrap();
         issue_interrupt::spawn_after((5 as u64).secs()).ok();
+        generate_sound::spawn();
 
         let rng = dp.RNG.constrain(&clocks);
 
@@ -104,11 +120,37 @@ mod app {
             },
             Local {
                 background_tasks: 0,
-                last_timer_value: 0
+                last_timer_value: 0,
+                dac
             },
             init::Monotonics(mono)
 
         )
+    }
+
+    #[task(local = [dac], shared = [usart])]
+    fn generate_sound(mut ctx: generate_sound::Context) {
+        
+        let dac = ctx.local.dac;
+         
+        let current = hal::dac::DacOut::get_value(dac);
+        ctx.shared.usart.lock(|usart| {
+            if current == 0 {
+                let dac2 = unsafe { &(*DAC::ptr()) };
+                //writeln!(usart, "inc: {:?}", dac2.dhr8r2.as_ptr());
+
+                dac2.dhr8r2.write(|w| unsafe { w.bits(20 as u32) });
+                hal::dac::DacOut::set_value(dac, 15);
+            } else {
+                //writeln!(usart, "dec");
+                let dac2 = unsafe { &(*DAC::ptr()) };
+                dac2.dhr8r2.write(|w| unsafe { w.bits(0 as u32) });
+                hal::dac::DacOut::set_value(dac, 0);
+            }
+        });
+        
+        generate_sound::spawn_after((500000 as u64).micros()).unwrap();
+             
     }
 
     #[idle(shared = [sleep_time, timer])]

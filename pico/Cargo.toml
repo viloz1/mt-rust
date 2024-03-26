@@ -7,7 +7,6 @@ version = "0.1.0"
 [dependencies]
 cortex-m = { version = "0.7.6"}
 cortex-m-rt = "0.7"
-cortex-m-rtic = "1.0.0"
 defmt = { version = "0.3.6", features = ["encoding-rzcobs"] }
 defmt-rtt = "0.4"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
@@ -26,6 +25,7 @@ panic-semihosting = "0.6.0"
 
 rp2040-monotonic = "1.2"
 rp2040-boot2 = "0.3.0"
+rtic = {version = "2.1.1", features = ["thumbv6-backend"]}
 # cargo build/run
 [profile.dev]
 codegen-units = 1

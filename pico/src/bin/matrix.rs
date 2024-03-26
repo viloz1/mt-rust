@@ -69,7 +69,7 @@ mod app {
     }
 
     #[init]
-    fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
+    fn init(ctx: init::Context) -> (Shared, Local) {
         defmt::info!("init");
         let mut pac = ctx.device;
 
@@ -178,7 +178,6 @@ mod app {
                 last_timer_value: 0,
                 uart,
             },
-            init::Monotonics(mono),
         )
     }
 
@@ -209,7 +208,7 @@ mod app {
     }
 
     #[task(shared = [timer_regs, sleep_time], local = [last_timer_value])]
-    fn calc_cpu(mut ctx: calc_cpu::Context) {
+    async fn calc_cpu(mut ctx: calc_cpu::Context) {
         let end_time = ctx
             .shared
             .timer_regs
@@ -229,8 +228,8 @@ mod app {
         defmt::info!("CPU usage: {}", cpu_usage * 100 as f64);
     }
 
-    #[task(shared = [result_matrix, a_matrix, b_matrix, concurrent_tasks, timer_regs], local=[start_time, uart], capacity = 5)]
-    fn task_i_row(mut ctx: task_i_row::Context, i: usize) {
+    #[task(shared = [result_matrix, a_matrix, b_matrix, concurrent_tasks, timer_regs], local=[start_time, uart])]
+    async fn task_i_row(mut ctx: task_i_row::Context, i: usize) {
         if i == 0 {
             ctx.shared.timer_regs.lock(|tim| {
                 *ctx.local.start_time = time_us_64(tim.hi.0, tim.lo.0);
