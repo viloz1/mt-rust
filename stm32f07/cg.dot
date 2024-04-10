@@ -1,73 +1,50 @@
 digraph {
     node [fontname=monospace shape=box]
-    0 [label="Reset\nmax = 80\nlocal = 0"]
-    1 [label="core::iter::traits::iterator::Iterator::for_each\nmax = 0\nlocal = 0"]
-    2 [label="cortex_m::interrupt::disable\nmax = 8\nlocal = 8"]
-    3 [label="heapless::sorted_linked_list::SortedLinkedList<T,Idx,K,_>::push_unchecked\nmax = 32\nlocal = 32"]
-    4 [label="reaction::app::monotonics::Tonic::now\nmax = 24\nlocal = 24"]
-    5 [label="reaction::app::idle\nmax = 64\nlocal = 24"]
-    6 [label="EXTI0_1\nmax = 32\nlocal = 32"]
-    7 [label="USART2\nmax = 168\nlocal = 72"]
-    8 [label="USART1\nmax = 96\nlocal = 64"]
-    9 [label="SysTick\nmax = 72\nlocal = 72"]
-    10 [label="main\nmax = 80\nlocal = 16"]
-    11 [label="reaction::app::rtic_ext::main::__rtic_init_resources\nmax = 32\nlocal = 32"]
-    12 [label="DefaultHandler_\nmax = 0\nlocal = 0"]
-    13 [label="DefaultPreInit\nmax = 0\nlocal = 0"]
-    14 [label="test_app::get_random_byte\nmax = 96\nlocal = 40"]
-    15 [label="__cpsid\nmax = 0\nlocal = 0"]
-    16 [label="__cpsie\nmax = 0\nlocal = 0"]
-    17 [label="__primask_r\nmax = 0\nlocal = 0"]
-    18 [label="__wfi\nmax = 0\nlocal = 0"]
-    19 [label="compiler_builtins::int::mul::Mul::mul\nmax = 36\nlocal = 36"]
-    20 [label="compiler_builtins::int::specialized_div_rem::u32_div_rem\nmax = 32\nlocal = 32"]
-    21 [label="__aeabi_lmul\nmax = 44\nlocal = 8"]
-    22 [label="__aeabi_uidiv\nmax = 40\nlocal = 8"]
-    23 [label="__udivmodsi4\nmax = 48\nlocal = 16"]
-    24 [label="__aeabi_uidivmod\nmax = 56\nlocal = 8"]
-    25 [label="HardFaultTrampoline\nmax = 0\nlocal = 0"]
-    26 [label="HardFault_\nmax = 0\nlocal = 0"]
-    6 -> 17
-    6 -> 15
-    6 -> 16
-    2 -> 15
-    23 -> 20
-    7 -> 14
-    7 -> 4
-    7 -> 17
-    7 -> 15
-    7 -> 16
-    7 -> 3
-    9 -> 17
-    9 -> 15
-    9 -> 16
-    22 -> 20
-    10 -> 2
-    10 -> 1
-    10 -> 11
-    10 -> 5
-    4 -> 17
-    4 -> 15
-    4 -> 16
-    11 -> 17
-    11 -> 15
-    11 -> 16
-    5 -> 17
-    5 -> 15
-    5 -> 18
-    5 -> 16
-    8 -> 17
-    8 -> 15
-    8 -> 16
-    8 -> 4
-    8 -> 3
-    21 -> 19
-    0 -> 13
+    0 [label="Reset\nmax = 48\nlocal = 0"]
+    1 [label="heapless::sorted_linked_list::SortedLinkedList<T,Idx,K,_>::push_unchecked\nmax = 32\nlocal = 32"]
+    2 [label="concurrency::app::monotonics::Tonic::now\nmax = 24\nlocal = 24"]
+    3 [label="USART3_4_5_6_7_8\nmax = 96\nlocal = 64"]
+    4 [label="USART2\nmax = 96\nlocal = 64"]
+    5 [label="USART1\nmax = 96\nlocal = 64"]
+    6 [label="SysTick\nmax = 80\nlocal = 80"]
+    7 [label="main\nmax = 48\nlocal = 8"]
+    8 [label="concurrency::app::rtic_ext::main::__rtic_init_resources\nmax = 40\nlocal = 40"]
+    9 [label="DefaultHandler_\nmax = 0\nlocal = 0"]
+    10 [label="DefaultPreInit\nmax = 0\nlocal = 0"]
+    11 [label="__cpsid\nmax = 0\nlocal = 0"]
+    12 [label="__cpsie\nmax = 0\nlocal = 0"]
+    13 [label="__nop\nmax = 0\nlocal = 0"]
+    14 [label="__primask_r\nmax = 0\nlocal = 0"]
+    15 [label="HardFaultTrampoline\nmax = 0\nlocal = 0"]
+    16 [label="HardFault_\nmax = 0\nlocal = 0"]
+    4 -> 2
+    4 -> 14
+    4 -> 11
+    4 -> 12
+    4 -> 1
+    2 -> 14
+    2 -> 11
+    2 -> 12
+    6 -> 14
+    6 -> 11
+    6 -> 12
+    3 -> 2
+    3 -> 14
+    3 -> 11
+    3 -> 12
+    3 -> 1
+    5 -> 2
+    5 -> 14
+    5 -> 11
+    5 -> 12
+    5 -> 1
+    8 -> 14
+    8 -> 11
+    8 -> 12
+    7 -> 11
+    7 -> 8
+    7 -> 13
     0 -> 10
-    5 -> 22
-    7 -> 22
-    7 -> 21
-    14 -> 24
-    24 -> 23
-    25 -> 26
+    0 -> 7
+    15 -> 16
 }

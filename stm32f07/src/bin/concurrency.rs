@@ -4,7 +4,6 @@
 
 use test_app as _; // global logger + panicking-behavior + memory layout
 
-// TODO(7) Configure the `rtic::app` macro
 #[rtic::app(
     device = stm32f0xx_hal::pac,
     dispatchers = [USART1, USART2, USART3_4_5_6_7_8],
@@ -16,14 +15,14 @@ mod app {
     use systick_monotonic::Systick;
 
     use stm32f0xx_hal::prelude::*;
-    use test_app::{setup_tim2, time_us, SYSTICK_FREQ};
+    use test_app::{setup_tim2, time_us};
+
     // Shared resources go here
     #[shared]
     struct Shared {
         shared_num: u16,
         tim2: TIM2,
         done: bool,
-        // TODO: Add resources
     }
 
     // Local resources go here
@@ -35,7 +34,7 @@ mod app {
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
-        defmt::info!("init");
+        //defmt::info!("init");
         let mut p = ctx.device;
         let cp = ctx.core;
 
@@ -44,7 +43,7 @@ mod app {
         p.RCC.apb1rstr.modify(|_, w| w.tim2rst().clear_bit());
 
         let rcc = p.RCC.configure().sysclk(8.mhz()).freeze(&mut p.FLASH);
-        
+
         let tim2 = p.TIM2;
         setup_tim2(&tim2, &rcc.clocks, 1.mhz());
 
@@ -79,10 +78,11 @@ mod app {
         (shared_num, tim2, done).lock(|num, tim2, done| {
             increase(num, tim2, done);
         });
+
         low_priority_task::spawn_after(systick_monotonic::ExtU64::micros(50)).ok();
     }
 
-    #[task(shared = [shared_num, tim2, done], priority = 2, capacity = 10)]
+    #[task(shared = [shared_num, tim2, done], priority = 2, capacity = 100)]
     fn medium_priority_task(ctx: medium_priority_task::Context) {
         let tim2 = ctx.shared.tim2;
         let shared_num = ctx.shared.shared_num;
@@ -91,6 +91,7 @@ mod app {
         (shared_num, tim2, done).lock(|num, tim2, done| {
             increase(num, tim2, done);
         });
+
         medium_priority_task::spawn_after(systick_monotonic::ExtU64::micros(100)).ok();
     }
 
@@ -103,13 +104,14 @@ mod app {
         (shared_num, tim2, done).lock(|num, tim2, done| {
             increase(num, tim2, done);
         });
+
         high_priority_task::spawn_after(systick_monotonic::ExtU64::micros(150)).ok();
     }
 
     fn increase(num: &mut u16, tim: &mut TIM2, done: &mut bool) {
         if *num == u16::MAX && !*done {
             let end = time_us(tim);
-            defmt::info!("MAX: {}", end);
+            //defmt::info!("MAX: {}", end);
             *done = true;
         } else if !*done {
             *num = *num + 1;

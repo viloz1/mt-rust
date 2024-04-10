@@ -83,8 +83,6 @@ mod app {
     }
 
     // TODO: Add tasks
-    //
-
     #[task(shared = [shared_num, timer, done, usart], priority = 1, capacity = 10)]
     fn low_priority_task(ctx: low_priority_task::Context) {
         let tim2 = ctx.shared.timer;

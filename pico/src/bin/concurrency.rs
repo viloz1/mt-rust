@@ -13,6 +13,7 @@ use test_app as _; // global logger + panicking-behavior + memory layout
 )]
 mod app {
     use rp2040_hal::fugit::RateExtU32;
+    use rp2040_hal::gpio::Pin;
     use rp2040_hal::Clock;
     use rp2040_hal::{
         gpio::{
@@ -21,16 +22,16 @@ mod app {
         },
         uart::{DataBits, Enabled, StopBits, UartConfig, UartPeripheral},
     };
-    use rp2040_monotonic::{Rp2040Monotonic, ExtU64};    use rp_pico::pac::UART0;
+    use rp2040_monotonic::{ExtU64, Rp2040Monotonic};
+    use rp_pico::pac::UART0;
     use test_app::{setup_clocks, time_us_64, write_to, PointerWrapper, TimerRegs};
-    use rp2040_hal::gpio::Pin;
 
     #[monotonic(binds = TIMER_IRQ_0, default = true)]
     type Rp2040Mono = Rp2040Monotonic;
 
     type NumberType = u32;
     const LIMIT: NumberType = 512_000;
-    
+
     // Shared resources go here
     #[shared]
     struct Shared {

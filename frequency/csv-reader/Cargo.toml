@@ -1,0 +1,13 @@
+[package]
+name = "csv-reader"
+version = "0.1.0"
+edition = "2021"
+[toolchain]
+channel = "nightly"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+indicatif = "0.17.8"
+plotters = "0.3.5"
+serde = {version = "1.0.197", features = ["serde_derive", "std"]}

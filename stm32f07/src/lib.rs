@@ -2,7 +2,6 @@
 #![no_std]
 
 use core::sync::atomic::{AtomicUsize, Ordering};
-use defmt_brtt as _; // global logger
 
 use embedded_hal::adc::OneShot;
 use panic_probe as _;
@@ -11,19 +10,11 @@ use stm32f0xx_hal::{self as _, adc::Adc, gpio::{gpioa::PA1, Analog}, pac::TIM2, 
 
 // same panicking *behavior* as `panic-probe` but doesn't print a panic message
 // this prevents the panic message being printed *twice* when `defmt::panic` is invoked
-#[defmt::panic_handler]
 
 fn panic() -> ! {
     cortex_m::asm::udf()
 }
 
-static COUNT: AtomicUsize = AtomicUsize::new(0);
-defmt::timestamp!("{=usize}", {
-    // NOTE(no-CAS) `timestamps` runs with interrupts disabled
-    let n = COUNT.load(Ordering::Relaxed);
-    COUNT.store(n + 1, Ordering::Relaxed);
-    n
-});
 
 /// Terminates the application and makes `probe-rs` exit with exit-code = 0
 pub fn exit() -> ! {
@@ -43,6 +34,36 @@ pub fn get_random_byte(adc: &mut Adc, in_pin: &mut PA1<Analog>) -> u8 {
         }
     }
     result
+}
+
+
+
+#[macro_export]
+macro_rules! stack_ptr {
+    () => ({
+        // Grab a copy of the stack pointer
+        let x: usize;
+        unsafe {
+            asm!("mov %rsp, $0" : "=r"(x) ::: "volatile");
+        }
+        x
+    })
+}
+
+/// Saves the current position of the stack. Any function
+/// being profiled must call this macro.
+#[macro_export]
+macro_rules! tick {
+    () => ({
+        // Save the current stack pointer in STACK_END
+        let stack_end = stack_ptr!();
+        
+        // Since the stack grows down, the "tallest"
+        // stack must have the least pointer value
+        let best = cmp::min(STACK_VALUE, stack_end);
+        STACK_VALUE = best;
+        
+    })
 }
 
 pub fn get_random_u16(adc: &mut Adc, in_pin: &mut PA1<Analog>) -> u16 {

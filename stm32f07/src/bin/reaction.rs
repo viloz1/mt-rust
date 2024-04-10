@@ -48,7 +48,6 @@ mod app {
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
-        defmt::info!("init");
         let mut p = ctx.device;
         let cp = ctx.core;
         p.RCC.apb1enr.modify(|_, w| w.tim2en().set_bit());
@@ -110,7 +109,6 @@ mod app {
 
     #[idle(shared = [sleep_time, tim2])]
     fn idle(mut ctx: idle::Context) -> ! {
-        defmt::info!("idle");
         loop {
            cortex_m::interrupt::free(|_cs| {
                 let start_time = ctx.shared.tim2.lock(|tim| {
@@ -135,7 +133,6 @@ mod app {
 
     #[task(priority = 2, shared = [button, tim2, interrupt_start_time])]
     fn trigger_interrupt(mut ctx: trigger_interrupt::Context) {
-       defmt::info!("test"); 
         ctx.shared.button.lock(| button | {
             let start_time = ctx.shared.interrupt_start_time;
             let tim2 = ctx.shared.tim2;
@@ -160,7 +157,6 @@ mod app {
 
         let sleep_time = get_random_byte(ctx.local.adc, ctx.local.an_in) % 10;
         let spawn_after = get_random_byte(ctx.local.adc, ctx.local.an_in) % 10;
-        defmt::info!("Sleep time: {}", sleep_time);
         loop {
             let current_time = ctx.shared.tim2.lock(|tim| {
                 time_us(tim)
@@ -203,7 +199,7 @@ mod app {
             cpu_usage
 
         });
-        defmt::info!("Interrupt time: {}us, background tasks: {}, CPU usage: {}", difference, ctx.local.background_tasks, cpu_usage * 100 as f64);
+        //defmt::info!("Interrupt time: {}us, background tasks: {}, CPU usage: {}", difference, ctx.local.background_tasks, cpu_usage * 100 as f64);
         *ctx.local.background_tasks = *ctx.local.background_tasks + 1;
         background_task::spawn().ok();
     }

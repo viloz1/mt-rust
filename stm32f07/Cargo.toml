@@ -8,9 +8,7 @@ version = "0.1.0"
 cortex-m = { version = "0.7.6", features = ["critical-section-single-core"]}
 cortex-m-rt = "0.7"
 cortex-m-rtic = "1.0.0"
-defmt = { version = "0.3", features = ["encoding-rzcobs"] }
-defmt-brtt = { version = "0.1", default-features = false, features = ["rtt"] }
-panic-probe = { version = "0.3", features = ["print-defmt"] }
+panic-probe = { version = "0.3" }
 # TODO add a monotonic if you use scheduling
 # rtic-monotonics = { version = "1.0.0", features = [ "cortex-m-systick" ]}
 #rp2040-hal = { version = "0.9.1", features = ["rt"]}

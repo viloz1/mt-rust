@@ -8,10 +8,22 @@ use cortex_m_rt::pre_init;
 use md407 as _;
 use stm32f4xx_hal::pac::SCB;
 
-const TONE_PERIOD_US: u64 = 2024;
-const NEW_TASK_INTERVAL_MS: u64 = 500;
-const BACKGROUND_TASK_SLEEP_US: u64 = 1;
-const BACKGROUND_PERIOD_US: u64 = 500;
+const PERIODS: [u64; 25] = [
+    2024, 1911, 1803, 1702, 1607, 1516, 1431, 1351, 1275, 1203, 1136, 1072, 1012, 955, 901, 851,
+    803, 758, 715, 675, 637, 601, 568, 536, 506,
+];
+
+const MELODY: [i64; 32] = [
+    0, 2, 4, 0, 0, 2, 4, 0, 4, 5, 7, 4, 5, 7, 7, 9, 7, 5, 4, 0, 7, 9, 7, 5, 4, 0, 0, -5, 0, 0, -5,
+    0,
+];
+
+// a = 2
+// b = 4
+// c = 1
+const NOTE_LENGTH: [u64; 32] = [
+    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 4, 2, 2, 4, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 4, 2, 2, 4,
+];
 
 #[pre_init()]
 unsafe fn startup() {
@@ -25,16 +37,16 @@ unsafe fn startup() {
 
 )]
 mod app {
-    use core::fmt::Write;
     use hal::dac::DacPin;
     use hal::pac::{DAC, TIM2, USART1};
-    use hal::prelude::*;
-    use hal::timer::CounterUs;
     use hal::uart::Serial;
     use md407::{hal, setup_usart, time_us_64};
+    use hal::timer::CounterUs;
+    use core::fmt::Write;
+    use hal::prelude::*;
     use systick_monotonic::*;
 
-    use crate::{BACKGROUND_TASK_SLEEP_US, NEW_TASK_INTERVAL_MS, TONE_PERIOD_US};
+    use crate::{MELODY, NOTE_LENGTH, PERIODS};
 
     // Shared resources go here
     #[shared]
@@ -48,6 +60,7 @@ mod app {
     struct Local {
         dac: hal::dac::C2,
         peak: bool,
+        melody_index: usize,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -90,7 +103,7 @@ mod app {
 
         let mut serial = setup_usart(usart1, tx_pin, rx_pin, clocks);
         background_task::spawn().ok();
-        inc_task::spawn().ok();
+        inc_sleep::spawn().ok();
 
         let mut timer = dp.TIM2.counter(&clocks);
         timer.start((300 as u32).secs()).ok();
@@ -104,21 +117,26 @@ mod app {
         (
             Shared {
                 usart: serial,
-                timer, // Initialization of shared resources go here
+                timer// Initialization of shared resources go here
             },
-            Local { dac, peak: false },
+            Local {
+                dac,
+                peak: false,
+                melody_index: 0,
+            },
             init::Monotonics(mono),
         )
     }
 
-    #[task(local = [dac, peak], shared = [usart], priority = 2)]
-    fn generate_sound(ctx: generate_sound::Context) {
-        generate_sound::spawn_after((2024 as u64).micros()).unwrap();
+    #[task(local = [dac, peak], priority = 1)]
+    fn generate_sound(mut ctx: generate_sound::Context) {
+        let period: u64 = 2024;
+        generate_sound::spawn_after((period).micros()).unwrap();
         let peak = ctx.local.peak;
 
         if *peak {
             let dac2 = unsafe { &(*DAC::ptr()) };
-            dac2.dhr8r2.write(|w| unsafe { w.bits(20) });
+            dac2.dhr8r2.write(|w| unsafe { w.bits(100) });
             *peak = false;
         } else {
             let dac2 = unsafe { &(*DAC::ptr()) };
@@ -128,23 +146,23 @@ mod app {
     }
 
     #[task(priority = 1)]
-    fn inc_task(_ctx: inc_task::Context) {
-        inc_task::spawn_after((NEW_TASK_INTERVAL_MS).millis()).ok();
+    fn inc_sleep(_ctx: inc_sleep::Context) {
+        inc_sleep::spawn_after((200 as u64).millis()).ok();
         background_task::spawn().ok();
-    }
 
+    }
+     
     #[task(shared = [timer], capacity = 200, priority = 1)]
     fn background_task(mut ctx: background_task::Context) {
         let period = (500 as u64).micros();
-        let end_time = ctx
-            .shared
-            .timer
-            .lock(|tim| time_us_64(tim) + 1);
+        let sleep = 1;
+
+        let end_time = ctx.shared.timer.lock(|tim| time_us_64(tim) + sleep);
         loop {
             let current_time = ctx.shared.timer.lock(|tim| time_us_64(tim));
             if current_time > end_time {
                 break;
-            }
+            }            
         }
         background_task::spawn_after(period).unwrap();
     }
