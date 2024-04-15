@@ -18,7 +18,6 @@ rand_core = "0.6.4"
 fugit = "0.3.7"
 cortex-m-rt = "0.7.3"
 
-
 # cargo build/run
 [profile.dev]
 codegen-units = 1

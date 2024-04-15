@@ -7,7 +7,7 @@ use test_app as _; // global logger + panicking-behavior + memory layout
 // TODO(7) Configure the `rtic::app` macro
 #[rtic::app(
     device = rp_pico::hal::pac,
-    dispatchers = [TIMER_IRQ_2, TIMER_IRQ_1],
+    dispatchers = [TIMER_IRQ_2],
     peripherals = true
 )]
 mod app {
@@ -30,6 +30,13 @@ mod app {
         // TODO: Add resources
         timer_regs: TimerRegs,
         sleep_time: u64,
+    }
+
+    // Local resources go here
+    #[local]
+    struct Local {
+        start_time: u64,
+        value: u64,
         uart: UartPeripheral<
             Enabled,
             UART0,
@@ -38,16 +45,6 @@ mod app {
                 Pin<Gpio1, FunctionUart, PullDown>,
             ),
         >,
-
-    }
-
-    // Local resources go here
-    #[local]
-    struct Local {
-        start_time: u64,
-        start_time_self: u64,
-        value: u64,
-        value_self: u64,
     }
 
     #[init]
@@ -98,8 +95,10 @@ mod app {
             lo: PointerWrapper(timerawl),
         };
 
+        let (s, r) = rtic_sync::make_channel!(u32, 5);
 
-        self_ping::spawn(1).ok();
+        ping::spawn(s).ok();
+        pong::spawn(r).ok();
 
         let sys_clock = clocks.system_clock.freq();
         let mut buf = [0u8; 512];
@@ -114,30 +113,29 @@ mod app {
             Shared {
                 timer_regs,
                 sleep_time: 0,
-                uart,
             },
             Local {
                 start_time,
                 value: 0,
-                value_self: 0,
-                start_time_self: start_time,
+                uart,
             },
         )
     }
 
     #[task(shared = [timer_regs, sleep_time], priority = 1)]
-    async fn ping(_ctx: ping::Context) {
+    async fn ping(_ctx: ping::Context, mut sender: rtic_sync::channel::Sender<'static, u32, 5>) {
         loop {
-            pong::spawn(1).ok();
+            sender.send(1).await.unwrap();
         }
     }
 
-    #[task(shared = [timer_regs, sleep_time, uart], local = [value, start_time], priority = 2)]
+    #[task(shared = [timer_regs, sleep_time], local = [value, uart, start_time], priority = 1)]
     async fn pong(
         mut ctx: pong::Context,
-        val: usize,
+        mut receiver: rtic_sync::channel::Receiver<'static, u32, 5>,
     ) {
-            *ctx.local.value = *ctx.local.value + val as u64;
+        while let Ok(_) = receiver.recv().await {
+            *ctx.local.value = *ctx.local.value + 1;
             if *ctx.local.value == 1_000_000 {
                 ctx.shared.timer_regs.lock(|regs| {
                     let end_time = time_us_64(regs.hi.0, regs.lo.0);
@@ -147,35 +145,10 @@ mod app {
                         format_args!("\n\rEnd time: {}\n\r", end_time - *ctx.local.start_time),
                     )
                     .unwrap();
-                    ctx.shared.uart.lock(|uart| {
-                        uart.write_full_blocking(print.as_bytes());
-                    });
+
+                    ctx.local.uart.write_full_blocking(print.as_bytes());
                 });
             }
+        }
     }
-
-    #[task(shared = [timer_regs, uart, sleep_time], local = [value_self, start_time_self], priority = 2)]
-    async fn self_ping(
-        mut ctx: self_ping::Context,
-        val: usize,
-    ) {
-            *ctx.local.value_self = *ctx.local.value_self + val as u64;
-            if *ctx.local.value_self == 1_000_000 {
-                ctx.shared.timer_regs.lock(|regs| {
-                    let end_time = time_us_64(regs.hi.0, regs.lo.0);
-                    let mut buf = [0u8; 512];
-                    let print: &str = write_to::show(
-                        &mut buf,
-                        format_args!("\n\rEnd time: {}\n\r", end_time - *ctx.local.start_time_self),
-                    )
-                    .unwrap();
-
-                    ctx.shared.uart.lock(|uart| {
-                        uart.write_full_blocking(print.as_bytes());
-                    });
-                });
-            }
-        self_ping::spawn(1);
-    }
-
 }

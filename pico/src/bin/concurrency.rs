@@ -12,6 +12,8 @@ use test_app as _; // global logger + panicking-behavior + memory layout
 
 )]
 mod app {
+    use core::fmt::Write;
+
     use rp2040_hal::fugit::RateExtU32;
     use rp2040_hal::gpio::Pin;
     use rp2040_hal::Clock;
@@ -30,7 +32,7 @@ mod app {
     type Rp2040Mono = Rp2040Monotonic;
 
     type NumberType = u32;
-    const LIMIT: NumberType = 512_000;
+    const LIMIT: NumberType = 10_000;
 
     // Shared resources go here
     #[shared]
@@ -51,7 +53,10 @@ mod app {
 
     // Local resources go here
     #[local]
-    struct Local {}
+    struct Local {
+        reference_num: NumberType,
+        reference_done: bool,
+    }
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
@@ -95,11 +100,9 @@ mod app {
             hi: PointerWrapper(timerawh),
             lo: PointerWrapper(timerawl),
         };
-        for _ in 0..20 {
-            low_priority_task::spawn().ok();
-            medium_priority_task::spawn().ok();
-            high_priority_task::spawn().ok();
-        }
+        //reference_task::spawn().ok();
+        low_priority_task::spawn().ok();
+        high_priority_task::spawn().ok();
 
         let mono = Rp2040Monotonic::new(pac.TIMER);
 
@@ -110,15 +113,35 @@ mod app {
                 done: false,
                 usart: uart,
             },
-            Local {},
+            Local {
+                reference_num: 0,
+                reference_done: false,
+            },
             init::Monotonics(mono),
         )
     }
 
     // TODO: Add tasks
     //
+    #[task(shared = [shared_num, timer_regs, usart], local = [reference_num, reference_done], priority = 1)]
+    fn reference_task(ctx: reference_task::Context) {
+        let tim2 = ctx.shared.timer_regs;
+        let num = ctx.local.reference_num;
+        let done = ctx.local.reference_done;
+        let usart = ctx.shared.usart;
+        if *num == LIMIT && !*done {
+            (tim2, usart).lock(|tim2, usart| {
+                let end = time_us_64(tim2.hi.0, tim2.lo.0);
+                writeln!(usart, "\n\rEnd time: {}\n\r", end).ok();
+            });
+            *done = true;
+        } else if !*done {
+            *num = *num + 1;
+            reference_task::spawn().ok();
+        }
+    }
 
-    #[task(shared = [shared_num, timer_regs, done, usart], priority = 1, capacity = 5)]
+    #[task(shared = [shared_num, timer_regs, done, usart], priority = 1)]
     fn low_priority_task(ctx: low_priority_task::Context) {
         let tim2 = ctx.shared.timer_regs;
         let shared_num = ctx.shared.shared_num;
@@ -131,20 +154,7 @@ mod app {
         low_priority_task::spawn().ok();
     }
 
-    #[task(shared = [shared_num, timer_regs, done, usart], priority = 2, capacity = 5)]
-    fn medium_priority_task(ctx: medium_priority_task::Context) {
-        let tim2 = ctx.shared.timer_regs;
-        let shared_num = ctx.shared.shared_num;
-        let done = ctx.shared.done;
-        let usart = ctx.shared.usart;
-
-        (shared_num, tim2, done, usart).lock(|num, tim2, done, usart| {
-            increase(num, tim2, done, usart);
-        });
-        medium_priority_task::spawn().ok();
-    }
-
-    #[task(shared = [shared_num, timer_regs, done, usart], priority = 3, capacity = 20)]
+    #[task(shared = [shared_num, timer_regs, done, usart], priority = 2)]
     fn high_priority_task(ctx: high_priority_task::Context) {
         let tim2 = ctx.shared.timer_regs;
         let shared_num = ctx.shared.shared_num;
@@ -154,7 +164,7 @@ mod app {
         (shared_num, tim2, done, usart).lock(|num, tim2, done, usart| {
             increase(num, tim2, done, usart);
         });
-        high_priority_task::spawn().ok();
+        high_priority_task::spawn_after(1.millis()).ok();
     }
 
     fn increase(
@@ -172,11 +182,7 @@ mod app {
     ) {
         if *num == LIMIT && !*done {
             let end = time_us_64(tim.hi.0, tim.lo.0);
-            let mut buf = [0u8; 512];
-            let print: &str =
-                write_to::show(&mut buf, format_args!("\n\rEnd time: {}\n\r", end)).unwrap();
-
-            usart.write_full_blocking(print.as_bytes());
+            writeln!(usart, "\n\rEnd time: {}\n\r", end).ok();
             *done = true;
         } else if !*done {
             *num = *num + 1;

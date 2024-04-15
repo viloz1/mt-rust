@@ -12,7 +12,6 @@ const LINES: usize = 10_000;
 const GRAPH_NAME: &str = "graph.png";
 
 fn add_iterator_to_csv_result<T>(pb: &ProgressBar, result_vec: &mut Vec<f32>, iter: &[Result<String, T>]){
-
         for line in iter {
         pb.inc(1);
             if let Ok(string) = line {
@@ -20,10 +19,7 @@ fn add_iterator_to_csv_result<T>(pb: &ProgressBar, result_vec: &mut Vec<f32>, it
                 result_vec.push(split_line[1].parse().unwrap());
             }
         }
-        
-
 }
-
 
 fn parse_csv(filename: &String) -> Result<Vec<f32>, Box<dyn Error>> {
     let mut file = std::fs::File::open(filename.clone()).unwrap();
