@@ -205,7 +205,7 @@ mod app {
         let tim = ctx.shared.timer_regs;
         let usart = ctx.shared.uart;
         let end_time = time_us_64(tim.hi.0, tim.lo.0);
-        writeln!(usart, "End_time: {:?}", end_time as f64).ok();
+        writeln!(usart, "{}", end_time).ok();
     }
 
     #[task(shared = [result_matrix, a_matrix, b_matrix, concurrent_tasks, timer_regs, uart], local = [start_stack, largest_stack], capacity = 15)]
@@ -214,6 +214,7 @@ mod app {
         for j in 0..crate::RESULT_MATRIX_COLUMNS {
             let mut tmp: f64 = 0.0;
             for k in 0..crate::A_MATRIX_COLUMNS {
+                tick(ctx.local.largest_stack);
                 tmp = tmp
                     + ctx.shared.a_matrix[i * crate::A_MATRIX_COLUMNS + k]
                         * ctx.shared.b_matrix[k * crate::B_MATRIX_COLUMNS + j];
@@ -232,7 +233,8 @@ mod app {
 
         if *n_tasks == 0 {
             let end_time = time_us_64(tim.hi.0, tim.lo.0);
-            writeln!(usart, "End_time: {:?}, stack: {}", end_time as f64, *ctx.local.start_stack - *ctx.local.largest_stack).ok();
+            writeln!(usart, "{:?}", end_time).ok();
+            writeln!(usart, "{:?}", ctx.local.largest_stack).ok();
         }
     }
 }
