@@ -30,7 +30,7 @@ mod app {
     #[monotonic(binds = SysTick, default = true)]
     type Tonic = Systick<100>;
 
-    const BACKGROUND_TASKS: usize = 10;
+    const BACKGROUND_TASKS: usize = 1;
 
     // Shared resources go here
     #[shared]
@@ -151,7 +151,7 @@ mod app {
             let start_time = ctx.shared.interrupt_start_time;
             (tim2, start_time).lock(|tim2, start_time| {
                 cortex_m::interrupt::free(|_cs| {
-                    tick(ctx.shared.largest_stack);
+                    //tick(ctx.shared.largest_stack);
                     button.swier.write(|w| w.swier0().set_bit());
                     *start_time = time_us(tim2)
                 });
@@ -163,7 +163,7 @@ mod app {
 
     }
 
-    #[task(priority = 1, local = [adc, an_in], shared = [tim2], capacity = 10)]
+    #[task(priority = 1, local = [adc, an_in], shared = [tim2], capacity = 1)]
     fn background_task(mut ctx: background_task::Context) {
         let start = ctx.shared.tim2.lock(|tim| {
             time_us(tim)
@@ -188,7 +188,7 @@ mod app {
         let end_time = ctx.shared.tim2.lock(|tim| {
             time_us(tim)
         });
-        tick(ctx.shared.largest_stack);
+        //tick(ctx.shared.largest_stack);
 
         ctx.shared.button.lock(| button | {
             cortex_m::interrupt::free(|_cs| { 
@@ -201,9 +201,9 @@ mod app {
         });
 
         let difference = end_time - start_time;
-        tick(ctx.shared.largest_stack);
-        writeln!(ctx.local.serial, "{:08x}", *ctx.shared.largest_stack);
-        //writeln!(ctx.local.serial, "{}", difference).ok();
-        tick(ctx.shared.largest_stack);
+        //tick(ctx.shared.largest_stack);
+        //writeln!(ctx.local.serial, "{:08x}", *ctx.shared.largest_stack);
+        writeln!(ctx.local.serial, "{}", difference).ok();
+        //tick(ctx.shared.largest_stack);
     }
 }

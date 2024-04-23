@@ -80,9 +80,9 @@ mod app {
 
         let real_serial = serial.unwrap();
 
-        //reference_task::spawn().ok();
-        low_priority_task::spawn().ok();
-        high_priority_task::spawn().ok();
+        reference_task::spawn().ok();
+        //low_priority_task::spawn().ok();
+        //high_priority_task::spawn().ok();
 
         let tim2 = p.TIM2;
         setup_tim2(&tim2, &rcc.clocks, 1.mhz());

@@ -94,11 +94,11 @@ mod app {
         let mono = Systick::new(cp.SYST, SYSTICK_FREQ);
 
 
-        for i in 0..crate::RESULT_MATRIX_ROWS {
+        /*for i in 0..crate::RESULT_MATRIX_ROWS {
             task_i_row::spawn(i).ok();
-        }
+        }*/
 
-        //task_reference::spawn().ok();
+        task_reference::spawn().ok();
 
         let start_stack = get_stack() as u32;
         
@@ -147,12 +147,12 @@ mod app {
         
         let end_time = time_us(tim);
 
-        writeln!(usart, "{}\n", end_time-start).ok();
+        writeln!(usart, "{}", end_time-start).ok();
     }
 
-    #[task(shared = [result_matrix, a_matrix, b_matrix, concurrent_tasks, tim2, serial], local = [start_conc, largest_stack, start_stack], capacity = 15)]
+    #[task(shared = [result_matrix, a_matrix, b_matrix, concurrent_tasks, tim2, serial], local = [start_conc, largest_stack, start_stack], capacity = 2)]
     fn task_i_row(ctx: task_i_row::Context, i: usize) {
-        //tick(ctx.local.largest_stack);
+        tick(ctx.local.largest_stack);
         let tim = ctx.shared.tim2;
         if i == 0 {
             *ctx.local.start_conc = time_us(tim);
@@ -160,7 +160,7 @@ mod app {
         for j in 0..crate::RESULT_MATRIX_COLUMNS {
             let mut tmp: f64 = 0.0;
             for k in 0..crate::A_MATRIX_COLUMNS {
-                //tick(ctx.local.largest_stack);
+                tick(ctx.local.largest_stack);
                 tmp = tmp
                     + ctx.shared.a_matrix[i * crate::A_MATRIX_COLUMNS + k]
                         * ctx.shared.b_matrix[k * crate::B_MATRIX_COLUMNS + j];
@@ -175,11 +175,11 @@ mod app {
         core::hint::black_box(ctx.shared.result_matrix);
 
         *n_tasks = *n_tasks - 1;
-        //tick(ctx.local.largest_stack);
+        tick(ctx.local.largest_stack);
         if *n_tasks == 0 {
             let end_time = time_us(tim);
-            writeln!(usart, "{} \n", end_time - *ctx.local.start_conc).ok();
-            //writeln!(usart, "{:#08x} \n", *ctx.local.largest_stack).ok();
+            //writeln!(usart, "{}", end_time - *ctx.local.start_conc).ok();
+            writeln!(usart, "{:#08x}", *ctx.local.largest_stack).ok();
         }
     }
 }
