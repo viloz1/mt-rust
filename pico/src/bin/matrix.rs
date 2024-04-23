@@ -21,6 +21,7 @@ const RESULT_MATRIX_COLUMNS: usize = B_MATRIX_COLUMNS;
     peripherals = true
 )]
 mod app {
+    use core::fmt::Write;
     use rp2040_hal::fugit::RateExtU32;
     use rp2040_hal::{clocks, Clock, Watchdog};
     use rp2040_hal::{
@@ -33,15 +34,15 @@ mod app {
     use rp2040_monotonic::Rp2040Monotonic;
     use rp_pico::pac::UART0;
     use rp_pico::XOSC_CRYSTAL_FREQ;
-    use test_app::{exit, setup_clocks, time_us_64, write_to, PointerWrapper, TimerRegs};
+    use test_app::{exit, get_stack, setup_clocks, tick, time_us_64, write_to, PointerWrapper, TimerRegs};
     #[monotonic(binds = TIMER_IRQ_0, default = true)]
     type Rp2040Mono = Rp2040Monotonic;
-    use embedded_hal::digital::v2::OutputPin;
     use rp2040_hal::gpio::Pin;
     // Shared resources go here
     #[shared]
     struct Shared {
         // TODO: Add resources
+        #[lock_free]
         timer_regs: TimerRegs,
         sleep_time: u64,
         #[lock_free]
@@ -52,13 +53,7 @@ mod app {
         b_matrix: [f64; crate::B_MATRIX_ROWS * crate::B_MATRIX_COLUMNS],
         #[lock_free]
         result_matrix: [f64; crate::RESULT_MATRIX_ROWS * crate::RESULT_MATRIX_COLUMNS],
-    }
-
-    // Local resources go here
-    #[local]
-    struct Local {
-        last_timer_value: u64,
-        start_time: u64,
+        #[lock_free]
         uart: UartPeripheral<
             Enabled,
             UART0,
@@ -67,6 +62,16 @@ mod app {
                 Pin<Gpio1, FunctionUart, PullDown>,
             ),
         >,
+    }
+
+    // Local resources go here
+    #[local]
+    struct Local {
+        last_timer_value: u64,
+        start_time: u64,
+        start_stack: u32,
+        largest_stack: u32
+        
     }
 
     #[init]
@@ -118,12 +123,13 @@ mod app {
             lo: PointerWrapper(timerawl),
         };
 
-        let mut concurrent_tasks = 0;
 
         for i in 0..crate::RESULT_MATRIX_ROWS {
-            concurrent_tasks += 1;
             task_i_row::spawn(i).ok();
         }
+        //task_reference::spawn();
+        //
+        let start_stack = get_stack() as u32;
 
         let mono = Rp2040Monotonic::new(pac.TIMER);
 
@@ -131,7 +137,7 @@ mod app {
             Shared {
                 timer_regs,
                 sleep_time: 0,
-                concurrent_tasks,
+                concurrent_tasks: crate::RESULT_MATRIX_ROWS as u8,
                 result_matrix: [0.0; crate::RESULT_MATRIX_ROWS * crate::RESULT_MATRIX_COLUMNS],
                 a_matrix: [
                     7986.45, 1292.79, 8583.79, 2072.98, 2161.08, 7137.87, 8844.89542, 1241.16699,
@@ -167,25 +173,44 @@ mod app {
                     1115.46655,
                     1150.36475,
                 ],
+                uart
 
             },
             Local {
                 start_time: 0,
                 last_timer_value: 0,
-                uart,
+                start_stack,
+                largest_stack: start_stack
             },
             init::Monotonics(mono),
         )
     }
 
 
-    #[task(shared = [result_matrix, a_matrix, b_matrix, concurrent_tasks, timer_regs], local=[start_time, uart], capacity = 5)]
-    fn task_i_row(mut ctx: task_i_row::Context, i: usize) {
-        if i == 0 {
-            ctx.shared.timer_regs.lock(|tim| {
-                *ctx.local.start_time = time_us_64(tim.hi.0, tim.lo.0);
-            });
+    #[task(shared = [result_matrix, a_matrix, b_matrix, concurrent_tasks, timer_regs, uart], capacity = 15)]
+    fn task_reference(ctx: task_reference::Context) {
+        for i in 0..crate::RESULT_MATRIX_ROWS {
+            for j in 0..crate::RESULT_MATRIX_COLUMNS {
+                let mut tmp: f64 = 0.0;
+                for k in 0..crate::A_MATRIX_COLUMNS {
+                    tmp = tmp
+                        + ctx.shared.a_matrix[i * crate::A_MATRIX_COLUMNS + k]
+                            * ctx.shared.b_matrix[k * crate::B_MATRIX_COLUMNS + j];
+                }
+
+                ctx.shared.result_matrix[i * crate::RESULT_MATRIX_COLUMNS + j] = tmp;
+            }
         }
+        core::hint::black_box(ctx.shared.result_matrix);
+        let tim = ctx.shared.timer_regs;
+        let usart = ctx.shared.uart;
+        let end_time = time_us_64(tim.hi.0, tim.lo.0);
+        writeln!(usart, "End_time: {:?}", end_time as f64).ok();
+    }
+
+    #[task(shared = [result_matrix, a_matrix, b_matrix, concurrent_tasks, timer_regs, uart], local = [start_stack, largest_stack], capacity = 15)]
+    fn task_i_row(ctx: task_i_row::Context, i: usize) {
+        tick(ctx.local.largest_stack);
         for j in 0..crate::RESULT_MATRIX_COLUMNS {
             let mut tmp: f64 = 0.0;
             for k in 0..crate::A_MATRIX_COLUMNS {
@@ -196,24 +221,18 @@ mod app {
 
             ctx.shared.result_matrix[i * crate::RESULT_MATRIX_COLUMNS + j] = tmp;
         }
-        let mut timer_regs = ctx.shared.timer_regs;
-        (timer_regs).lock(|tim| {
-            *ctx.shared.concurrent_tasks = *ctx.shared.concurrent_tasks - 1;
-            core::hint::black_box(&ctx.shared.result_matrix);
-            if *ctx.shared.concurrent_tasks == 0 {
-                let end_time = time_us_64(tim.hi.0, tim.lo.0);
-                let mut buf = [0u8; 64];
-                let print: &str = write_to::show(
-                    &mut buf,
-                    format_args!(
-                        "{}\n",
-                        end_time - *ctx.local.start_time,
-                    ),
-                )
-                .unwrap();
+        let n_tasks = ctx.shared.concurrent_tasks;
+        let tim = ctx.shared.timer_regs;
+        let usart = ctx.shared.uart;
 
-                ctx.local.uart.write_full_blocking(print.as_bytes());
-            }
-        });
+        core::hint::black_box(ctx.shared.result_matrix);
+
+        *n_tasks = *n_tasks - 1;
+        tick(ctx.local.largest_stack);
+
+        if *n_tasks == 0 {
+            let end_time = time_us_64(tim.hi.0, tim.lo.0);
+            writeln!(usart, "End_time: {:?}, stack: {}", end_time as f64, *ctx.local.start_stack - *ctx.local.largest_stack).ok();
+        }
     }
 }

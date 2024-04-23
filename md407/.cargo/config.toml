@@ -19,7 +19,7 @@ target = "thumbv7em-none-eabihf" # Cortex-M4F and Cortex-M7F (with FPU)
 #target = "thumbv7em-none-eabihf" # Cortex-M4F (with FPU)
 
 [alias]
-rb = "run --bin"
+rb = "run --release --bin"
 rrb = "run --release --bin"
 bbr = "build --release --bin"
 

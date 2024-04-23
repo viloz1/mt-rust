@@ -117,7 +117,7 @@ fn main() {
 
     chart
         .draw_series(LineSeries::new(
-            (values).iter().map(|x| *x),
+            (values),
             &RED,
         )).unwrap();
 

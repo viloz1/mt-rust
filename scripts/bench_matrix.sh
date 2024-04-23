@@ -2,16 +2,16 @@
 
 killall cat
 
-FILENAME="matrix.txt"
+FILENAME="results.txt"
 
 stty -F /dev/ttyACM0 115200 cooked -echo -parenb cs8 -cstopb
 cat /dev/ttyACM0 > $FILENAME &
 
-cd ../pico
+cd ../stm32f07/
 
 NLINES=$(du -sb "../scripts/$FILENAME" | awk '{print $1}')
 
-for i in {1..5}
+for i in {0..50}
 do
    cargo rb matrix &
    cargo_pid=$!

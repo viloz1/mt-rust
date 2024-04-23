@@ -2,6 +2,7 @@
 #![no_std]
 
 use core::sync::atomic::{AtomicUsize, Ordering};
+use cortex_m_rt::pre_init;
 use defmt_rtt as _; // global logger
 
 use panic_probe as _;
@@ -42,6 +43,31 @@ pub const CPU_PERIOD: u64 = 3;
 pub struct TimerRegs {
     pub hi: PointerWrapper,
     pub lo: PointerWrapper,
+}
+
+pub const ADDRESS: *mut u32 = 0x2000_0000 as *mut u32;
+
+#[pre_init]
+unsafe fn startup() {
+    let test = cortex_m::register::msp::read();
+    core::ptr::write_volatile(ADDRESS, test);
+}
+
+pub fn get_stack() -> usize {
+    let start_stack: usize;
+    unsafe {
+        let value = core::ptr::read_volatile(ADDRESS);
+        start_stack = value as usize;
+    }
+    start_stack
+}
+
+pub fn tick(current: &mut u32) {
+    let stack_end = cortex_m::register::msp::read();
+
+    if stack_end < *current {
+        *current = stack_end;
+    }
 }
 
 pub struct PointerWrapper(pub *mut u32);

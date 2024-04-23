@@ -3,6 +3,7 @@
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use cortex_m_rt::pre_init;
 use embedded_hal::adc::OneShot;
 use panic_probe as _;
 
@@ -24,6 +25,13 @@ pub fn exit() -> ! {
 }
 
 pub const SYSTICK_FREQ: u32 = 48_000_000;
+pub const ADDRESS: *mut u32 = 0x2000_0000 as *mut u32;
+
+#[pre_init]
+unsafe fn startup() {
+    let test = cortex_m::register::msp::read();
+    core::ptr::write_volatile(ADDRESS, test);
+}
 
 pub fn get_random_byte(adc: &mut Adc, in_pin: &mut PA1<Analog>) -> u8 {
     let mut result = 0;
@@ -34,36 +42,6 @@ pub fn get_random_byte(adc: &mut Adc, in_pin: &mut PA1<Analog>) -> u8 {
         }
     }
     result
-}
-
-
-
-#[macro_export]
-macro_rules! stack_ptr {
-    () => ({
-        // Grab a copy of the stack pointer
-        let x: usize;
-        unsafe {
-            asm!("mov %rsp, $0" : "=r"(x) ::: "volatile");
-        }
-        x
-    })
-}
-
-/// Saves the current position of the stack. Any function
-/// being profiled must call this macro.
-#[macro_export]
-macro_rules! tick {
-    () => ({
-        // Save the current stack pointer in STACK_END
-        let stack_end = stack_ptr!();
-        
-        // Since the stack grows down, the "tallest"
-        // stack must have the least pointer value
-        let best = cmp::min(STACK_VALUE, stack_end);
-        STACK_VALUE = best;
-        
-    })
 }
 
 pub fn get_random_u16(adc: &mut Adc, in_pin: &mut PA1<Analog>) -> u16 {
@@ -108,4 +86,21 @@ pub fn setup_tim2<T>(tim2: &TIM2, clocks: &Clocks, timeout: T) where T: Into<Her
 
 pub fn time_us(tim2: &TIM2) -> u64 {
     (tim2.cnt.read().bits() as u64 * 1_000_000) / SYSTICK_FREQ as u64
+}
+
+pub fn tick(current: &mut u32) {
+    let stack_end = cortex_m::register::msp::read();
+
+    if stack_end < *current {
+        *current = stack_end;
+    }
+}
+
+pub fn get_stack() -> usize {
+    let start_stack: usize;
+    unsafe {
+        let value = core::ptr::read_volatile(ADDRESS);
+        start_stack = value as usize;
+    }
+    start_stack
 }
