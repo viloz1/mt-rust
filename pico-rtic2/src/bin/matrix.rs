@@ -4,13 +4,13 @@
 
 use test_app as _; // global logger + panicking-behavior + memory layout
 
-const SHARED_SIZE: usize = 4;
+const SHARED_SIZE: usize = 8;
 
-const A_MATRIX_ROWS: usize = 3;
+const A_MATRIX_ROWS: usize = 8;
 const A_MATRIX_COLUMNS: usize = SHARED_SIZE;
 
 const B_MATRIX_ROWS: usize = SHARED_SIZE;
-const B_MATRIX_COLUMNS: usize = 7;
+const B_MATRIX_COLUMNS: usize = 40;
 
 const RESULT_MATRIX_ROWS: usize = A_MATRIX_ROWS;
 const RESULT_MATRIX_COLUMNS: usize = B_MATRIX_COLUMNS;
@@ -21,10 +21,11 @@ const RESULT_MATRIX_COLUMNS: usize = B_MATRIX_COLUMNS;
     peripherals = true
 )]
 mod app {
+    use cortex_m::register::msp;
     use embedded_hal::digital::v2::OutputPin;
     use rp2040_hal::fugit::RateExtU32;
     use rp2040_hal::gpio::Pin;
-    use rp2040_hal::Clock;
+    use rp2040_hal::{clocks, Clock, Watchdog};
     use rp2040_hal::{
         gpio::{
             bank0::{Gpio0, Gpio1},
@@ -33,11 +34,17 @@ mod app {
         uart::{DataBits, Enabled, StopBits, UartConfig, UartPeripheral},
     };
     use rp_pico::pac::UART0;
+    use rp_pico::XOSC_CRYSTAL_FREQ;
     use rtic_sync::channel::{Receiver, Sender};
-    use test_app::{setup_clocks, time_us_64, write_to, PointerWrapper, TimerRegs};
+    use test_app::{setup_clocks, tick, time_us_64, write_to, PointerWrapper, TimerRegs};
+    use core::fmt::Write;
+
+    use crate::RESULT_MATRIX_ROWS;
     // Shared resources go here
     #[shared]
-    struct Shared {}
+    struct Shared {
+
+    }
 
     // Local resources go here
     #[local]
@@ -50,6 +57,7 @@ mod app {
         a_matrix: [f64; crate::A_MATRIX_ROWS * crate::A_MATRIX_COLUMNS],
         b_matrix: [f64; crate::B_MATRIX_ROWS * crate::B_MATRIX_COLUMNS],
         result_matrix: [f64; crate::RESULT_MATRIX_ROWS * crate::RESULT_MATRIX_COLUMNS],
+        largest_stack: u32,
 
         start_time: u64,
         uart: UartPeripheral<
@@ -64,20 +72,23 @@ mod app {
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local) {
-        defmt::info!("init");
         let mut pac = ctx.device;
 
         let timerawh = pac.TIMER.timerawh.as_ptr();
         let timerawl = pac.TIMER.timerawl.as_ptr();
 
-        let clocks = setup_clocks(
+        let mut watchdog = Watchdog::new(pac.WATCHDOG);
+        let clocks = clocks::init_clocks_and_plls(
+            XOSC_CRYSTAL_FREQ,
             pac.XOSC,
-            pac.WATCHDOG,
             pac.CLOCKS,
             pac.PLL_SYS,
             pac.PLL_USB,
             &mut pac.RESETS,
-        );
+            &mut watchdog,
+        )
+        .ok()
+        .unwrap();
         // The single-cycle I/O block controls our GPIO pins
         let sio = rp2040_hal::Sio::new(pac.SIO);
 
@@ -102,35 +113,24 @@ mod app {
             )
             .unwrap();
 
-        let mut led_pin = pins.gpio25.into_push_pull_output();
-        led_pin.set_high().unwrap();
-
         let timer_regs = TimerRegs {
             hi: PointerWrapper(timerawh),
             lo: PointerWrapper(timerawl),
         };
 
-        let mut concurrent_tasks = 0;
+        let concurrent_tasks = RESULT_MATRIX_ROWS as u8;
 
-        let (mut s, r) = rtic_sync::make_channel!(usize, { crate::RESULT_MATRIX_ROWS });
+        let (s, r) = rtic_sync::make_channel!(usize, { crate::RESULT_MATRIX_ROWS });
+        
+        //reference_task::spawn().ok();
 
-        for i in 0..crate::RESULT_MATRIX_ROWS {
-            concurrent_tasks += 1;
-        }
-
-        task_i_row::spawn(r);
-        spawn_i_row::spawn(s);
-
-        let sys_clock = clocks.system_clock.freq();
-        let mut buf = [0u8; 512];
-        let print: &str =
-            write_to::show(&mut buf, format_args!("\n\rSys clk: {}\n\r", sys_clock)).unwrap();
-
-        uart.write_full_blocking(print.as_bytes());
+        task_i_row::spawn(r).ok();
+        spawn_i_row::spawn(s).ok();
 
         (
             Shared {},
             Local {
+                largest_stack: msp::read(),
                 start_time: 0,
                 last_timer_value: 0,
                 uart,
@@ -138,72 +138,22 @@ mod app {
                 sleep_time: 0,
                 concurrent_tasks,
                 result_matrix: [0.0; crate::RESULT_MATRIX_ROWS * crate::RESULT_MATRIX_COLUMNS],
-                a_matrix: [
-                    7986.45, 1292.79, 8583.79, 2072.98, 2161.08, 7137.87, 8844.89542, 1241.16699,
-                    9333.09941, 1046.33654, 1766.28663, 227.57371,
-                ],
-                b_matrix: [
-                    2089.46,
-                    484.29,
-                    4070.86,
-                    6388.14,
-                    5878.41,
-                    7796.02,
-                    4174.04910,
-                    3779.38097,
-                    1819.78879,
-                    392.12370,
-                    5173.20243,
-                    2525.39435,
-                    4430.77499,
-                    3700.96781,
-                    3312.82425,
-                    2487.50948,
-                    1680.72726,
-                    1257.68497,
-                    5224.09199,
-                    5027.58651,
-                    4620.30426,
-                    7821.20553,
-                    5898.87661,
-                    3104.60453,
-                    4500.93917,
-                    3847.383526,
-                    1115.46655,
-                    1150.36475,
-                ],
+                a_matrix: [4244.414350405894, 5386.011125484884, 209.27151037805984, 8320.633858162555, 6246.787365244573, 364.9568687340236, 4379.140825495792, 4239.739339063737, 1332.5864892241393, 6428.185470698703, 8275.31489946057, 4361.152446464416, 9997.324663646094, 3829.1363870631603, 4468.219803791731, 4847.224166623009, 4659.658753873815, 6029.631435831589, 8713.65656106301, 2977.203864675881, 137.47059570771677, 7601.802176426443, 3212.981130969402, 703.7599977848644, 7010.577989464238, 9727.002010306178, 9692.23770375902, 3025.135161237314, 408.3147451563641, 1252.3574162987122, 9936.807827926155, 6342.222264280734, 6006.698489510839, 5323.917755690009, 4186.801970407355, 3759.0382280510385, 4594.6335737781055, 7760.445862795432, 5818.354194675447, 2391.8765647717923, 316.195469085565, 3864.2008937817063, 92.6020331307634, 3098.251327350124, 2180.593113148481, 6910.716011414083, 8909.143774944805, 6999.64915005546, 3773.8421633976277, 7586.529047241985, 2275.3712431212903, 4806.341010845052, 9424.060842563313, 7226.860724966912, 7704.2996257261075, 8610.378748365669, 4249.206385305406, 6872.224245850335, 4885.346713298899, 2548.2575756377596, 6817.499606726475, 2954.9514347214313, 4811.364025533253, 7688.4476901840735],
+                b_matrix: [4572.641279498933, 8.18036431756791, 8331.90490424325, 4135.664619940735, 6693.260703226198, 390.29356497130766, 6753.196634729926, 5025.29504545816, 8643.691680160538, 1053.5940775421739, 685.621654203448, 5957.8980649292025, 7624.922057713783, 8472.496042694209, 9107.220024660664, 2966.7856087199807, 436.31513882638706, 5990.180013060972, 1509.3299065697363, 9787.421144383065, 3880.668947262626, 457.12859487265086, 3155.9908343953075, 23.571574014576775, 8220.290903423376, 2826.684628687179, 606.83857022858, 4866.280129069892, 3959.4833650658898, 572.9915699214148, 6018.920378207957, 4538.905717367602, 4912.555505190607, 4818.607785033592, 8047.306681840761, 9937.527075443257, 9713.419197855666, 2454.049889116547, 7066.097882870245, 6734.662110088401, 3715.5045825479488, 126.24572749384673, 8599.322429507007, 9381.23571671897, 9811.387153084463, 6252.459469172916, 4163.647911663322, 6100.864529277618, 6031.222075617114, 6023.570146152305, 8902.914629542895, 1695.047743579125, 2681.6251276077855, 1004.7779062662453, 5940.716276889315, 9081.906622350245, 8169.811586739108, 3576.261927292827, 9673.71969602524, 2958.4093572588463, 4198.927079095015, 851.5780782625499, 5403.391460875896, 2670.361323186919, 1863.0353886772514, 1455.8430461073108, 1221.7776969130455, 9909.848018237828, 6768.687207270927, 742.7891477663549, 7555.061140294844, 3849.993398176527, 297.9132700034249, 3355.734033771178, 4188.176454573078, 1127.7371182256609, 4838.361263965679, 5990.179665376204, 4912.511410362054, 4196.732633710848, 4408.1109074363885, 7798.517603678637, 4060.4212125665567, 9148.79779016715, 7897.448415857617, 2824.3669354007434, 3597.759314147984, 526.3408117360397, 5000.060710940836, 6750.319566600349, 5915.02323482885, 9808.474289722119, 3579.712793363508, 2822.330374281433, 9847.958790307412, 8700.421372071163, 181.93014729494575, 9128.836268518033, 1996.3044663836981, 7688.802715582583, 3137.1405485761848, 4569.911985930213, 2641.1677733827455, 3297.4175157589775, 8790.512341161406, 925.6980397509166, 2026.8082015241507, 6917.9683009559485, 1324.31138622342, 6736.227571892404, 9494.996529038834, 6202.455908559764, 4059.0914904975702, 637.9371712127597, 2632.3632551030487, 4365.219113617087, 8391.050397400588, 3448.4662766329957, 7347.308469330576, 1673.033938507273, 9476.987887610398, 3414.5201463405883, 9080.654958007573, 1441.4564955157045, 2879.09376141868, 5545.893289703927, 422.2831810508104, 1352.6875997554146, 1984.8745697271138, 9609.035651868702, 1706.0194322123891, 8563.930969937437, 3302.656508467116, 3460.174518870282, 3756.4110660368174, 1754.876614980667, 5918.808815527773, 7572.437706879628, 159.1175636113991, 6251.510712551017, 2242.484196714224, 5348.197359326709, 6719.17919661516, 1445.6050571612514, 6760.7499040018065, 2056.1253762549186, 77.29092788560128, 8979.380146730076, 9082.485157837367, 4769.253064697445, 1288.9122237569006, 7374.312554903791, 9777.246926288444, 542.4101839255562, 8258.271344618406, 6556.493314023635, 3124.880636519097, 2556.928413925972, 9139.293060231716, 5467.633649634611, 2694.1231004985384, 5474.821723669, 6748.665113990943, 4493.803507214838, 425.2434728378137, 3748.241070702191, 424.8662931014783, 3096.674267640271, 6051.159119656781, 6565.508877776821, 8637.948514457312, 3831.7211206245975, 2272.4485924021933, 4940.1985291958945, 9100.277909702489, 791.8115449155864, 1423.9445965536577, 8051.600262735728, 6204.770878551079, 5178.320806021114, 680.4948383092627, 8990.716931057, 6593.38751087975, 2402.48796089594, 3829.7372421468854, 2664.7638963633426, 6079.999869963815, 254.57960158328805, 5099.178957903915, 4740.501402196534, 5494.288153609383, 7314.501569163627, 4992.379416918124, 8482.31654892792, 1151.5017873129636, 5359.851654417237, 1943.7627374060442, 9717.984041237221, 8157.1761065363025, 7669.578989647811, 7436.971380693646, 557.9682428428927, 6206.764836663656, 66.4969533286982, 9396.323527893937, 4709.6840150708085, 4339.95571175665, 6872.7654487387545, 6661.604084607832, 9471.520983710423, 1890.5624941962935, 8865.087706125261, 7067.421509630767, 2757.5951502261046, 6961.463029579566, 8243.447132022611, 1102.8338038819893, 6022.311716006555, 4204.458160123923, 813.6546487343855, 4315.796459497669, 18.75824588050101, 629.8754356717806, 6857.325710116666, 4327.770864122436, 1648.9482219312763, 3681.2878330784292, 4740.627087466245, 5237.464402547813, 2267.382084345088, 8696.474036807613, 716.9534396209875, 1280.4897450643875, 6868.674748055055, 3395.291698760254, 2087.531736871806, 1340.9952422498686, 3267.2926633540424, 3564.1414536698167, 4806.421033975836, 5112.496261041656, 2188.8963459248703, 986.8116878762635, 7743.365880994239, 4569.801380339675, 3634.657384695782, 7728.277015552925, 6768.289351684366, 8039.473863223249, 3043.97517752829, 1366.7385889051411, 9970.557934409271, 601.4133760240228, 5088.566211715131, 3300.6692747281118, 4300.749707932765, 8276.55826128941, 1501.3107567041195, 4001.6889987965874, 3612.052317425966, 7498.811367224816, 5459.219669781638, 2085.969142521534, 9029.14875306537, 5160.396330494527, 8447.930238614881, 6001.810600247014, 1509.2010374400013, 6661.841326235457, 6230.18404430653, 8616.80515788306, 3632.306768232865, 371.80486037593124, 7098.375905471423, 9544.143927597559, 4167.934105838591, 2234.127448240763, 3563.9430333147398, 2632.578719711881, 3448.3131279467784, 5470.905189722554, 6110.457874402688, 504.28066561204986, 5743.494653831397, 5746.836185149126, 1853.2423497484317, 5028.545448540018, 6986.354071026756, 2061.968898331788, 7343.346428182251, 9720.14114992389, 4139.7163607056455, 4365.83640080932, 1704.360589535326, 4584.647344492374, 9785.832643361036, 8703.431185988155, 7106.959404969398, 9765.71710491411, 2382.944029895367, 8310.734599923473, 6585.9522907122955, 5439.289048481407, 582.2122407577245, 6520.103712974699, 2860.8594799736807, 3520.767349038576, 6252.239829204143, 638.5537797959637, 3113.794675326393, 5997.633378152925, 1714.5037737758846, 5340.600305240786, 2654.758613836655, 4668.84570821144, 3971.7548601318313, 8847.91513940805, 2446.9798377243715, 2107.011197971192, 8299.470389555283]
             },
         )
     }
-    #[task(priority = 1)]
-    async fn spawn_i_row(ctx: spawn_i_row::Context, mut s: Sender<'static, usize, {crate::RESULT_MATRIX_ROWS}>) {
-        for i in 0..crate::RESULT_MATRIX_ROWS {
-            s.send(i).await;
-        }
-    }
-
-    #[task(local=[start_time, uart, result_matrix, a_matrix, b_matrix, concurrent_tasks, timer_regs], priority = 1)]
-    async fn task_i_row(
-        ctx: task_i_row::Context,
-        mut r: rtic_sync::channel::Receiver<'static, usize, { crate::RESULT_MATRIX_ROWS }>,
-    ) {
-        let mut buf = [0u8; 512];
-            let print: &str = write_to::show(&mut buf, format_args!("\n\rEnd_time\n\r",)).unwrap();
-
-            ctx.local.uart.write_full_blocking(print.as_bytes());
-
-
+    /*
+    #[task(priority = 1, local=[uart, result_matrix, a_matrix, b_matrix, timer_regs])]
+    async fn reference_task(ctx: reference_task::Context) {
         let regs = ctx.local.timer_regs;
         let a_matrix = ctx.local.a_matrix;
         let b_matrix = ctx.local.b_matrix;
         let result_matrix = ctx.local.result_matrix;
-        let tasks = ctx.local.concurrent_tasks;
 
-        loop {
-            let i = r.recv().await.unwrap();
-            if i == 0 {
-                *ctx.local.start_time = time_us_64(regs.hi.0, regs.lo.0);
-            }
+        let start = time_us_64(regs.hi.0, regs.lo.0);
+
+        for i in 0..RESULT_MATRIX_ROWS {
             for j in 0..crate::RESULT_MATRIX_COLUMNS {
                 let mut tmp: f64 = 0.0;
                 for k in 0..crate::A_MATRIX_COLUMNS {
@@ -214,26 +164,64 @@ mod app {
 
                 result_matrix[i * crate::RESULT_MATRIX_COLUMNS + j] = tmp;
             }
+        }
+
+        let end = time_us_64(regs.hi.0, regs.lo.0);
+        writeln!(ctx.local.uart, "{}", end-start);
+    }
+    */
+    
+
+    #[task(priority = 1)]
+    async fn spawn_i_row(_ctx: spawn_i_row::Context, mut s: Sender<'static, usize, {crate::RESULT_MATRIX_ROWS}>) {
+        for i in 0..crate::RESULT_MATRIX_ROWS {
+            s.send(i).await.ok();
+        }
+    }
+    
+    
+    #[task(local=[start_time, uart, result_matrix, a_matrix, b_matrix, concurrent_tasks, timer_regs, largest_stack], priority = 1)]
+    async fn task_i_row(
+        ctx: task_i_row::Context,
+        mut r: rtic_sync::channel::Receiver<'static, usize, { crate::RESULT_MATRIX_ROWS }>,
+    ) {
+        let regs = ctx.local.timer_regs;
+        let a_matrix = ctx.local.a_matrix;
+        let b_matrix = ctx.local.b_matrix;
+        let result_matrix = ctx.local.result_matrix;
+        let tasks = ctx.local.concurrent_tasks;
+        tick(ctx.local.largest_stack);
+        loop {
+            tick(ctx.local.largest_stack);
+            let i = r.recv().await.unwrap();
+            if i == 0 {
+                *ctx.local.start_time = time_us_64(regs.hi.0, regs.lo.0);
+            }
+            for j in 0..crate::RESULT_MATRIX_COLUMNS {
+                let mut tmp: f64 = 0.0;
+                for k in 0..crate::A_MATRIX_COLUMNS {
+                    tick(ctx.local.largest_stack);
+                    tmp = tmp
+                        + a_matrix[i * crate::A_MATRIX_COLUMNS + k]
+                            * b_matrix[k * crate::B_MATRIX_COLUMNS + j];
+                }
+
+                result_matrix[i * crate::RESULT_MATRIX_COLUMNS + j] = tmp;
+            }
 
             *tasks = *tasks - 1;
 
-            
-            if *tasks == 0 {
-                let end_time = time_us_64(regs.hi.0, regs.lo.0);
-                let mut buf = [0u8; 512];
-                let print: &str = write_to::show(
-                    &mut buf,
-                    format_args!(
-                        "\n\rEnd_time: {}, diff: {}, Matrix: {:?}\n\r",
-                        end_time,
-                        end_time - *ctx.local.start_time,
-                        result_matrix
-                    ),
-                )
-                .unwrap();
+            tick(ctx.local.largest_stack);
 
-                ctx.local.uart.write_full_blocking(print.as_bytes());
+            if *tasks == 0 {
+                core::hint::black_box(&result_matrix);
+                let end_time = time_us_64(regs.hi.0, regs.lo.0);
+                //writeln!(ctx.local.uart, "{}", end_time - *ctx.local.start_time).ok();
+                writeln!(ctx.local.uart, "{:08x}", *ctx.local.largest_stack).ok();
+
             }
         }
     }
+    
+    
 }

@@ -72,10 +72,10 @@ mod app {
         let systick = cp.SYST;
         let mono = Systick::new(systick, 168_000_000);
 
-        //reference_task::spawn().ok();
+        reference_task::spawn().ok();
 
-        low_priority_task::spawn().ok();
-        high_priority_task::spawn().ok();
+        //low_priority_task::spawn().ok();
+        //high_priority_task::spawn().ok();
 
         let mut timer = dp.TIM2.counter(&clocks);
         timer.start((300 as u32).secs()).ok();

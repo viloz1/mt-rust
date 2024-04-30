@@ -20,12 +20,12 @@ mod app {
     use md407::{get_random_byte, hal as hal, setup_usart, tick, time_us_64};
 
     use stm32f4xx_hal::gpio::Pin;
-    use hal::pac::{DAC, TIM2, USART1};
+    use hal::pac::{TIM2, USART1};
     use hal::prelude::*;
     use systick_monotonic::*;
     use core::fmt::Write;
 
-    const BACKGROUND_TASKS: usize = 50;
+    const BACKGROUND_TASKS: usize = 100;
 
 
     // Shared resources go here
@@ -120,7 +120,7 @@ mod app {
         )
     }
 
-    #[task(priority = 1, shared = [rng, timer], capacity = 50)]
+    #[task(priority = 1, shared = [rng, timer], capacity = 100)]
     fn background_task(mut ctx: background_task::Context) {
         let mut timer = ctx.shared.timer;
 
@@ -152,8 +152,8 @@ mod app {
         issue_interrupt::spawn_after((1 as u64).secs()).ok();
         (button, timer, start_time).lock(|button, timer, start_time| {
             //tick(ctx.shared.largest_stack);
-            cortex_m::peripheral::NVIC::pend(button.interrupt());
             *start_time = time_us_64(timer);
+            cortex_m::peripheral::NVIC::pend(button.interrupt());
         });
     }
 

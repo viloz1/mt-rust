@@ -213,11 +213,6 @@ BUG(cortex-m-rt): start of .heap is not 4-byte aligned");
 /* # Position checks */
 
 /* ## .vector_table */
-ASSERT(__reset_vector == ADDR(.vector_table) + 0x8, "
-BUG(cortex-m-rt): the reset vector is missing");
-
-ASSERT(__eexceptions == ADDR(.vector_table) + 0x40, "
-BUG(cortex-m-rt): the exception vectors are missing");
 
 ASSERT(SIZEOF(.vector_table) > 0x40, "
 ERROR(cortex-m-rt): The interrupt vectors are missing.

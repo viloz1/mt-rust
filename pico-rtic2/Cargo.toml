@@ -7,9 +7,7 @@ version = "0.1.0"
 [dependencies]
 cortex-m = { version = "0.7.6"}
 cortex-m-rt = "0.7"
-defmt = { version = "0.3.6", features = ["encoding-rzcobs"] }
-defmt-rtt = "0.4"
-panic-probe = { version = "0.3", features = ["print-defmt"] }
+panic-probe = { version = "0.3" }
 # TODO(4) Select the correct rtic backend
 #cortex-m-rtic = "1.0.0"
 # TODO(5) Add hal as dependency
@@ -53,7 +51,7 @@ debug = false
 debug-assertions = false # <-
 incremental = false
 lto = 'fat'
-opt-level = "z" # <-
+opt-level = "s" # <-
 overflow-checks = false # <-
 
 # cargo test --release

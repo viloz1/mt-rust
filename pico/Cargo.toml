@@ -49,7 +49,7 @@ debug = false
 debug-assertions = false # <-
 incremental = false
 lto = 'off'
-opt-level = "z" # <-
+opt-level = "s" # <-
 overflow-checks = false # <-
 
 # cargo test --release
