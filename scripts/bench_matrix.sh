@@ -4,16 +4,16 @@ killall cat
 
 FILENAME="results.txt"
 
-stty -F /dev/ttyACM0 115200 cooked -echo -parenb cs8 -cstopb
-cat /dev/ttyACM0 > $FILENAME &
+stty -F /dev/ttyACM1 115200 cooked -echo -parenb cs8 -cstopb
+cat /dev/ttyACM1 > $FILENAME &
 
-cd ../stm32f07/
+cd ../pico/
 
 NLINES=$(du -sb "../scripts/$FILENAME" | awk '{print $1}')
 
-for i in {0..50}
+for i in {1..50}
 do
-   cargo rb matrix &
+   cargo rb concurrency &
    cargo_pid=$!
    while [ $(du -sb "../scripts/$FILENAME"  | awk '{print $1}') == $NLINES ]; do sleep 0.5; done
    NLINES=$(du -sb "../scripts/$FILENAME"  | awk '{print $1}')

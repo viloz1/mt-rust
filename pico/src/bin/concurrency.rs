@@ -104,9 +104,9 @@ mod app {
             hi: PointerWrapper(timerawh),
             lo: PointerWrapper(timerawl),
         };
-        reference_task::spawn().ok();
-        //low_priority_task::spawn().ok();
-        //high_priority_task::spawn().ok();
+        //reference_task::spawn().ok();
+        low_priority_task::spawn().ok();
+        high_priority_task::spawn().ok();
 
         let mono = Rp2040Monotonic::new(pac.TIMER);
 
@@ -135,21 +135,23 @@ mod app {
     // TODO: Add tasks
     //
     #[task(shared = [shared_num, timer_regs, usart], local = [reference_num, reference_done, start], priority = 1)]
-    fn reference_task(ctx: reference_task::Context) {
-        let tim2 = ctx.shared.timer_regs;
+    fn reference_task( mut ctx: reference_task::Context) {
+        let tim = &mut ctx.shared.timer_regs;
         let num = ctx.local.reference_num;
+        let usart = &mut ctx.shared.usart;
         let done = ctx.local.reference_done;
-        let usart = ctx.shared.usart;
-        if *num == LIMIT && !*done {
-            (tim2, usart).lock(|tim2, usart| {
-                let end = time_us_64(tim2.hi.0, tim2.lo.0);
-                writeln!(usart, "{}\n", end-*ctx.local.start).ok();
-            });
-            *done = true;
-        } else if !*done {
-            *num = *num + 1;
-            reference_task::spawn().ok();
-        }
+        
+        loop {
+            if *num == LIMIT && !*done {
+                (&mut *tim, &mut *usart).lock(|tim, usart| {
+                    let end = time_us_64(tim.hi.0, tim.lo.0);
+                    writeln!(usart, "{}", end).ok();
+                });
+                *done = true;
+            } else if !*done {
+                *num = *num + 1;
+            }
+        }    
     }
 
     #[task(shared = [shared_num, timer_regs, done, usart, largest_stack, start_conc], priority = 1)]
@@ -162,9 +164,9 @@ mod app {
 
         loop {
             (&mut *shared_num, &mut *tim, &mut *done, &mut *usart, &mut *l).lock(|num, tim, done, usart, l| {
-                tick(l);
+                //tick(l);
                 increase(num, tim, done, usart, l);
-                tick(l);
+                //tick(l);
             });
         }
     }
@@ -178,9 +180,9 @@ mod app {
         let l = ctx.shared.largest_stack;
         
         (shared_num, tim2, done, usart, l).lock(|num, tim2, done, usart, l| {
-            tick(l);
+            //tick(l);
             increase(num, tim2, done, usart, l);
-            tick(l);
+            //tick(l);
         });
         high_priority_task::spawn_after(1.millis()).ok();
     }
@@ -201,7 +203,8 @@ mod app {
     ) {
         if *num == LIMIT && !*done {
             let end = time_us_64(tim.hi.0, tim.lo.0);
-            writeln!(usart, "{}\n", end).ok();
+            writeln!(usart, "{}", end).ok();
+            //writeln!(usart, "{:08x}", *largest_stack).ok();
             *done = true;
         } else if !*done {
             *num = *num + 1;
