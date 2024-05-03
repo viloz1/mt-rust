@@ -46,11 +46,11 @@ mod app {
         #[lock_free]
         concurrent_tasks: u8,
         #[lock_free]
-        a_matrix: [f64; crate::A_MATRIX_ROWS * crate::A_MATRIX_COLUMNS],
+        a_matrix: [f32; crate::A_MATRIX_ROWS * crate::A_MATRIX_COLUMNS],
         #[lock_free]
-        b_matrix: [f64; crate::B_MATRIX_ROWS * crate::B_MATRIX_COLUMNS],
+        b_matrix: [f32; crate::B_MATRIX_ROWS * crate::B_MATRIX_COLUMNS],
         #[lock_free]
-        result_matrix: [f64; crate::RESULT_MATRIX_ROWS * crate::RESULT_MATRIX_COLUMNS],
+        result_matrix: [f32; crate::RESULT_MATRIX_ROWS * crate::RESULT_MATRIX_COLUMNS],
     }
 
     // Local resources go here
@@ -90,10 +90,10 @@ mod app {
             cortex_m::peripheral::NVIC::unmask(hal::interrupt::TIM2);
             cortex_m::peripheral::NVIC::unmask(hal::interrupt::TIM4);
         }
-        /*for i in 0..crate::RESULT_MATRIX_ROWS {
+        for i in 0..crate::RESULT_MATRIX_ROWS {
             task_i_row::spawn(i).ok();
-        }*/
-        task_reference::spawn().ok();
+        }
+        //task_reference::spawn().ok();
         let start_stack = get_stack();
 
         let mut timer = dp.TIM2.counter(&clocks);
@@ -124,7 +124,7 @@ mod app {
         let start = time_us_64(ctx.shared.timer);
         for i in 0..crate::RESULT_MATRIX_ROWS {
             for j in 0..crate::RESULT_MATRIX_COLUMNS {
-                let mut tmp: f64 = 0.0;
+                let mut tmp: f32 = 0.0;
                 for k in 0..crate::A_MATRIX_COLUMNS {
                     tmp = tmp
                         + ctx.shared.a_matrix[i * crate::A_MATRIX_COLUMNS + k]
@@ -134,7 +134,7 @@ mod app {
                 ctx.shared.result_matrix[i * crate::RESULT_MATRIX_COLUMNS + j] = tmp;
             }
         }
-        core::hint::black_box(ctx.shared.result_matrix);
+        core::hint::black_box(&ctx.shared.result_matrix);
         let tim = ctx.shared.timer;
         let usart = ctx.shared.usart;
         let end_time = time_us_64(tim);
@@ -147,11 +147,11 @@ mod app {
         if i == 0 {
             *ctx.local.start = time_us_64(ctx.shared.timer);
         }
-        tick(ctx.local.largest_stack);
+        //tick(ctx.local.largest_stack);
         for j in 0..crate::RESULT_MATRIX_COLUMNS {
-            let mut tmp: f64 = 0.0;
+            let mut tmp: f32 = 0.0;
             for k in 0..crate::A_MATRIX_COLUMNS {
-                tick(ctx.local.largest_stack);
+                //tick(ctx.local.largest_stack);
                 tmp = tmp
                     + ctx.shared.a_matrix[i * crate::A_MATRIX_COLUMNS + k]
                         * ctx.shared.b_matrix[k * crate::B_MATRIX_COLUMNS + j];
@@ -164,14 +164,14 @@ mod app {
         let usart = ctx.shared.usart;
 
         core::hint::black_box(ctx.shared.result_matrix);
-        tick(ctx.local.largest_stack);
+        //tick(ctx.local.largest_stack);
 
         *n_tasks = *n_tasks - 1;
         if *n_tasks == 0 {
             let end_time = time_us_64(tim);
             tick(ctx.local.largest_stack);
-            //writeln!(usart, "{:?}", end_time - *ctx.local.start).ok();
-            writeln!(usart, "{:08x}", *ctx.local.largest_stack).ok();
+            writeln!(usart, "{:?}", end_time - *ctx.local.start).ok();
+            //writeln!(usart, "{:08x}", *ctx.local.largest_stack).ok();
             reset(tim);
         }
     }

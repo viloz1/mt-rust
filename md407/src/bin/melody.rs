@@ -25,11 +25,7 @@ const NOTE_LENGTH: [u64; 32] = [
     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 4, 2, 2, 4, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 4, 2, 2, 4,
 ];
 
-#[pre_init()]
-unsafe fn startup() {
-    (*SCB::PTR).ccr.modify(|r| r & !(1 << 3));
-    //(*RCC::PTR).apb1enr.modify(|_, w| w.dacen().set_bit());
-}
+
 #[rtic::app(
     device = stm32f4xx_hal::pac,
     dispatchers = [EXTI4, EXTI3, USART3, USART6],
@@ -46,8 +42,6 @@ mod app {
     use hal::prelude::*;
     use systick_monotonic::*;
 
-    use crate::{MELODY, NOTE_LENGTH, PERIODS};
-
     // Shared resources go here
     #[shared]
     struct Shared {
@@ -60,11 +54,12 @@ mod app {
     struct Local {
         dac: hal::dac::C2,
         peak: bool,
-        melody_index: usize,
     }
 
     #[monotonic(binds = SysTick, default = true)]
     type MyMono = Systick<100000>; // 100 000 Hz / 1 us granularity
+    
+    const BACKGROUND_TASKS: usize = 0;
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
@@ -102,8 +97,10 @@ mod app {
         let usart1 = dp.USART1;
 
         let mut serial = setup_usart(usart1, tx_pin, rx_pin, clocks);
-        background_task::spawn().ok();
-        inc_sleep::spawn().ok();
+
+        for _ in 0..BACKGROUND_TASKS {
+            background_task::spawn().ok();
+        }
 
         let mut timer = dp.TIM2.counter(&clocks);
         timer.start((300 as u32).secs()).ok();
@@ -122,14 +119,13 @@ mod app {
             Local {
                 dac,
                 peak: false,
-                melody_index: 0,
             },
             init::Monotonics(mono),
         )
     }
 
     #[task(local = [dac, peak], priority = 1)]
-    fn generate_sound(mut ctx: generate_sound::Context) {
+    fn generate_sound(ctx: generate_sound::Context) {
         let period: u64 = 2024;
         generate_sound::spawn_after((period).micros()).unwrap();
         let peak = ctx.local.peak;
@@ -145,16 +141,9 @@ mod app {
         }
     }
 
-    #[task(priority = 1)]
-    fn inc_sleep(_ctx: inc_sleep::Context) {
-        inc_sleep::spawn_after((200 as u64).millis()).ok();
-        background_task::spawn().ok();
-
-    }
-     
     #[task(shared = [timer], capacity = 200, priority = 1)]
     fn background_task(mut ctx: background_task::Context) {
-        let period = (500 as u64).micros();
+        let period = (1000 as u64).micros();
         let sleep = 1;
 
         let end_time = ctx.shared.timer.lock(|tim| time_us_64(tim) + sleep);

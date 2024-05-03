@@ -6,8 +6,8 @@ FILENAME="results.txt"
 
 
 cd ../md407
-cargo bbr concurrency
-arm-none-eabi-objcopy -S -O srec "./target/thumbv7em-none-eabihf/release/concurrency" app.s19 &&
+cargo bbr matrix
+arm-none-eabi-objcopy -S -O srec "./target/thumbv7em-none-eabihf/release/matrix" app.s19 &&
 
 stty -F /dev/ttyACM0 115200 cooked -echo -parenb cs8 -cstopb
 stty -F /dev/ttyUSB0 115200 cooked -echo -parenb cs8 -cstopb

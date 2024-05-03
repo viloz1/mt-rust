@@ -102,9 +102,9 @@ mod app {
             lo: PointerWrapper(timerawl),
         };
 
-        //low_priority_task::spawn().ok();
-        //high_priority_task::spawn().ok();
-        reference_task::spawn().ok();
+        low_priority_task::spawn().ok();
+        high_priority_task::spawn().ok();
+        //reference_task::spawn().ok();
 
         let rp2040_timer_token = rtic_monotonics::create_rp2040_monotonic_token!();
         Timer::start(pac.TIMER, &mut pac.RESETS, rp2040_timer_token);
@@ -169,9 +169,9 @@ mod app {
             let start = &mut ctx.shared.start_conc;
             let l = &mut ctx.shared.largest_stack;
             (shared_num, tim2, done, usart, start, l).lock(|num, tim2, done, usart, start, l| {
-                tick(l);
+                //tick(l);
                 increase(num, tim2, done, usart, start, l);
-                tick(l);
+                //tick(l);
             });
         }
     }
@@ -186,9 +186,9 @@ mod app {
             let start = &mut ctx.shared.start_conc;
             let l = &mut ctx.shared.largest_stack;
             (shared_num, tim2, done, usart, start, l).lock(|num, tim2, done, usart, start, l| {
-                tick(l);
+                //tick(l);
                 increase(num, tim2, done, usart, start, l);
-                tick(l);
+                //tick(l);
             });
             Timer::delay(1_u64.millis()).await;
         }
@@ -211,9 +211,9 @@ mod app {
     ) {
         if *num == LIMIT && !*done {
             let end = time_us_64(tim.hi.0, tim.lo.0);
-            tick(l);
+            //tick(l);
 
-            writeln!(usart, "{:08x}", *l).ok();
+            writeln!(usart, "{}", end-*start).ok();
 
             
 

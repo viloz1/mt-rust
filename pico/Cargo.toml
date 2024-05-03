@@ -48,8 +48,8 @@ codegen-units = 1
 debug = false
 debug-assertions = false # <-
 incremental = false
-lto = 'off'
-opt-level = "s" # <-
+lto = 'fat'
+opt-level = 's' # <-
 overflow-checks = false # <-
 
 # cargo test --release

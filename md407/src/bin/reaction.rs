@@ -175,11 +175,11 @@ mod app {
         }); 
 
         let differnece = end_time - start_time;
-
+        
         //tick(ctx.shared.largest_stack);
 
         ctx.shared.usart.lock(|usart| {
-            writeln!(usart, "{}", differnece).ok();
+            writeln!(usart, "{}, {}", differnece, end_time).ok();
             //writeln!(usart, "{:08x}", *ctx.shared.largest_stack).ok();
         });
         

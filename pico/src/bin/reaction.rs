@@ -56,7 +56,7 @@ mod app {
 
     }
 
-    const BACKGROUND_TASKS: usize = 100;
+    const BACKGROUND_TASKS: usize = 10;
 
     #[monotonic(binds = TIMER_IRQ_0, default = true)]
     type Rp2040Mono = Rp2040Monotonic;
@@ -170,7 +170,7 @@ mod app {
         )
     }
 
-    #[task(priority = 1, shared = [rosc, timer_regs], capacity = 100)]
+    #[task(priority = 1, shared = [rosc, timer_regs], capacity = 10)]
     fn background_task(mut ctx: background_task::Context) {
         let start = ctx.shared.timer_regs.lock(|timer_regs| {
             return time_us_64(timer_regs.hi.0, timer_regs.lo.0);
@@ -203,7 +203,7 @@ mod app {
         let interrupt_start_time = ctx.shared.interrupt_start_time;
         let timer_regs = ctx.shared.timer_regs;
         (interrupt_start_time, timer_regs, in_pin).lock(|start_time, timer_regs, pin| {
-            tick(ctx.shared.largest_stack);
+            //tick(ctx.shared.largest_stack);
             *start_time = time_us_64(timer_regs.hi.0, timer_regs.lo.0);
             let _ = pin.set_high();
         });
@@ -221,14 +221,14 @@ mod app {
             let end_time = time_us_64(timer_regs.hi.0, timer_regs.lo.0);
             (*start_time, end_time)
         });
-        tick(ctx.shared.largest_stack);
+        //tick(ctx.shared.largest_stack);
         ctx.shared.in_pin.lock(|pin| {
             pin.set_low().ok();
         });
 
         let interrupt_time = end_time - start_time;
 
-        tick(ctx.shared.largest_stack);
+        //tick(ctx.shared.largest_stack);
 
         writeln!(ctx.local.uart, "{:08x}", 
             ctx.shared.largest_stack).ok();

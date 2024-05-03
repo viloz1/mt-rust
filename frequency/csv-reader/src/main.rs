@@ -7,7 +7,7 @@ use plotters::prelude::*;
 use std::str;
 const UPPER_LIMIT: f32 = 0.250;
 const LOWER_LIMIT: f32 = 0.220;
-const INTERVAL: f32 = 0.0000001;
+const INTERVAL: f32 = 0.0000001; //0.0001
 const LINES: usize = 10_000;
 const GRAPH_NAME: &str = "graph.png";
 
