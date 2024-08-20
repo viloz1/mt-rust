@@ -7,7 +7,7 @@ FILENAME="results.txt"
 stty -F /dev/ttyACM0 115200 cooked -echo -parenb cs8 -cstopb
 cat /dev/ttyACM0 > $FILENAME &
 
-cd ../pico/
+cd ../pico-rtic2/
 
 NLINES=$(du -sb "../scripts/$FILENAME" | awk '{print $1}')
 

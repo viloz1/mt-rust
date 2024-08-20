@@ -129,9 +129,9 @@ mod app {
 
         loop {
             (&mut *shared_num, &mut *tim2, &mut *done, &mut *usart, &mut *l).lock(|num, tim, done, usart, l| {
-                //tick(l);
+                tick(l);
                 increase(num, tim, done, usart, l);
-                //tick(l);
+                tick(l);
             });
         }
     }
@@ -145,9 +145,9 @@ mod app {
         let l = ctx.shared.largest_stack;
 
         (shared_num, tim2, done, usart, l).lock(|num, tim2, done, usart, l| {
-            //tick(l);
+            tick(l);
             increase(num, tim2, done, usart, l);
-            //tick(l);
+            tick(l);
         });
         low_priority_task::spawn_after((1 as u64).millis()).ok();
     }
@@ -162,8 +162,8 @@ mod app {
         let old = *num;
         if old == LIMIT && !*done {
             let end = time_us_64(tim);
-            //writeln!(*usart, "{:08x}", largest_stack).ok();
-            writeln!(*usart, "{}", end).ok();
+            writeln!(*usart, "{:08x}", largest_stack).ok();
+            //writeln!(*usart, "{}", end).ok();
             *done = true;
             reset(tim); 
         }

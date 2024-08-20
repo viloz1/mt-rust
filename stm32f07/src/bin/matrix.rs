@@ -5,7 +5,7 @@
 use test_app as _; // global logger + panicking-behavior + memory layout
 
 extern "C" {
-    static mut _stack_start: u32;
+    static mut _stack_start: usize;
 }
 
 const A_MATRIX_ROWS: usize = 2;
@@ -18,6 +18,7 @@ const B_MATRIX_COLUMNS: usize = 5;
 
 const RESULT_MATRIX_ROWS: usize = A_MATRIX_ROWS;
 const RESULT_MATRIX_COLUMNS: usize = B_MATRIX_COLUMNS;
+
 
 // TODO(7) Configure the `rtic::app` macro
 #[rtic::app(
@@ -77,7 +78,6 @@ mod app {
         p.RCC.apb1rstr.modify(|_, w| w.tim2rst().set_bit());
         p.RCC.apb1rstr.modify(|_, w| w.tim2rst().clear_bit());
         let mut rcc = p.RCC.configure().sysclk(48.mhz()).freeze(&mut p.FLASH);
-
         
         let mut serial: Option<Serial<USART1, PA9<Alternate<AF1>>, PA10<Alternate<AF1>>>> = None;
 
@@ -89,16 +89,20 @@ mod app {
             serial = Some(Serial::usart1(p.USART1, (tx, rx), 115_200.bps(), &mut rcc));
         });
 
-        let real_serial = serial.unwrap();
+        let mut real_serial = serial.unwrap();
 
         let mono = Systick::new(cp.SYST, SYSTICK_FREQ);
 
+        unsafe {
+            let stack_start = &_stack_start as *const _ as u32;
+            writeln!(real_serial, "_start_stack: {:08x}", stack_start);
+        }
 
-        /*for i in 0..crate::RESULT_MATRIX_ROWS {
+        for i in 0..crate::RESULT_MATRIX_ROWS {
             task_i_row::spawn(i).ok();
-        }*/
+        }
 
-        task_reference::spawn().ok();
+        //task_reference::spawn().ok();
 
         let start_stack = get_stack() as u32;
         
@@ -143,7 +147,7 @@ mod app {
                 ctx.shared.result_matrix[i * crate::RESULT_MATRIX_COLUMNS + j] = tmp;
             }
         }
-        core::hint::black_box(ctx.shared.result_matrix);
+        core::hint::black_box(&ctx.shared.result_matrix);
         
         let end_time = time_us(tim);
 
@@ -171,15 +175,15 @@ mod app {
         let n_tasks = ctx.shared.concurrent_tasks;
         
         let usart = ctx.shared.serial;
-        
-        core::hint::black_box(ctx.shared.result_matrix);
 
+        core::hint::black_box(&ctx.shared.result_matrix);
         *n_tasks = *n_tasks - 1;
         tick(ctx.local.largest_stack);
         if *n_tasks == 0 {
             let end_time = time_us(tim);
-            //writeln!(usart, "{}", end_time - *ctx.local.start_conc).ok();
-            writeln!(usart, "{:#08x}", *ctx.local.largest_stack).ok();
+            writeln!(usart, "{}", end_time - *ctx.local.start_conc).ok();
+            
+            writeln!(usart, "Final: {:#08x}", *ctx.local.largest_stack).ok();
         }
     }
 }

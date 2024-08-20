@@ -1,3 +1,4 @@
+
 /* MEMORY
 { */
   /* NOTE 1 K = 1 KiBi = 1024 bytes */
@@ -43,3 +44,5 @@ MEMORY
      } > RAM2
    } INSERT AFTER .bss;
 */
+
+_stack_start = ORIGIN(RAM) + LENGTH(RAM);

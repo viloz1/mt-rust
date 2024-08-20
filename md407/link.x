@@ -1,3 +1,4 @@
+
 /* # Developer notes
 
 - Symbols that start with a double underscore (__) are considered "private"
@@ -60,7 +61,7 @@ PROVIDE(__pre_init = DefaultPreInit);
 /* # Sections */
 SECTIONS
 {
-  PROVIDE(_stack_start = ORIGIN(RAM) + LENGTH(RAM));
+  PROVIDE(_stack_start = ORIGIN(RAM) + LENGTH(RAM) - 16);
 
   /* ### Vector table */
   .vector_table ORIGIN(VECTOR) :

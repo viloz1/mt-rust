@@ -17,7 +17,7 @@ touch "../scripts/$FILENAME"
 
 NLINES=$(du -sb "../scripts/$FILENAME" | awk '{print $1}')
 
-for i in {0..50}
+for i in {1..50}
 do
     echo "Loading..."
     echo 'load' > /dev/ttyUSB0 &&
@@ -31,8 +31,6 @@ do
     echo "Loaded!"
     echo 'go' > /dev/ttyUSB0
     NLINES=$(du -sb "../scripts/$FILENAME" | awk '{print $1}')
-    
-    
     
     while [ $(du -sb "../scripts/$FILENAME"  | awk '{print $1}') == $NLINES ]; do sleep 0.1; done
     kill $read_pid

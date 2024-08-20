@@ -41,7 +41,7 @@ pub struct PointerWrapper(pub *mut u32);
 
 unsafe impl Send for PointerWrapper {}
 
-pub const ADDRESS: *mut u32 = 0x2000_0000 as *mut u32;
+pub const ADDRESS: *mut u32 = 0x2000_3000 as *mut u32;
 
 #[pre_init]
 unsafe fn startup() {

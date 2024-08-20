@@ -4,6 +4,12 @@
 
 use test_app as _; // global logger + panicking-behavior + memory layout
 
+extern "C" {
+    static mut _sdata: u8;
+    static mut _edata: u8;
+    static mut _stack_start: usize;
+}
+
 const SHARED_SIZE: usize = 8;
 
 const A_MATRIX_ROWS: usize = 8;
@@ -22,6 +28,8 @@ const RESULT_MATRIX_COLUMNS: usize = B_MATRIX_COLUMNS;
 )]
 mod app {
     use core::fmt::Write;
+    use core::ptr::read_volatile;
+    use cortex_m::register::{ msp};
     use rp2040_hal::fugit::RateExtU32;
     use rp2040_hal::{clocks, Clock, Watchdog};
     use rp2040_hal::{
@@ -38,6 +46,9 @@ mod app {
     #[monotonic(binds = TIMER_IRQ_0, default = true)]
     type Rp2040Mono = Rp2040Monotonic;
     use rp2040_hal::gpio::Pin;
+
+    use crate::_stack_start;
+
     // Shared resources go here
     #[shared]
     struct Shared {
@@ -71,11 +82,12 @@ mod app {
         start_time: u64,
         start_stack: u32,
         largest_stack: u32
-        
     }
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
+        let test_start = msp::read(); 
+
         let mut pac = ctx.device;
 
         let timerawh = pac.TIMER.timerawh.as_ptr();
@@ -110,18 +122,23 @@ mod app {
             // UART RX (characters received by RP2040) on pin 2 (GPIO1)
             pins.gpio1.into_function(),
         );
-        let uart = rp2040_hal::uart::UartPeripheral::new(pac.UART0, uart_pins, &mut pac.RESETS)
+        let mut uart = rp2040_hal::uart::UartPeripheral::new(pac.UART0, uart_pins, &mut pac.RESETS)
             .enable(
                 UartConfig::new(115200.Hz(), DataBits::Eight, None, StopBits::One),
                 clocks.peripheral_clock.freq(),
             )
             .unwrap();
 
+        unsafe {
+            let stack_start = &_stack_start as *const _ as u32;
+            //writeln!(uart, "MSP: {:08x}, Core: {:?}, _start_stack: {:08x}", test_start, rp2040_hal::sio::Sio::core(), stack_start).ok();
+
+        }
+
         let timer_regs = TimerRegs {
             hi: PointerWrapper(timerawh),
             lo: PointerWrapper(timerawl),
         };
-
 
         for i in 0..crate::RESULT_MATRIX_ROWS {
             task_i_row::spawn(i).ok();
@@ -171,15 +188,14 @@ mod app {
                 ctx.shared.result_matrix[i * crate::RESULT_MATRIX_COLUMNS + j] = tmp;
             }
         }
-        core::hint::black_box(ctx.shared.result_matrix);
+        core::hint::black_box(&ctx.shared.result_matrix);
         let end_time = time_us_64(tim.hi.0, tim.lo.0);
         writeln!(usart, "{}", end_time-start_time).ok();
     }
 
     #[task(shared = [result_matrix, a_matrix, b_matrix, concurrent_tasks, timer_regs, uart], local = [start_time, start_stack, largest_stack], capacity = 40)]
     fn task_i_row(ctx: task_i_row::Context, i: usize) {
-        
-        //tick(ctx.local.largest_stack);
+        tick(ctx.local.largest_stack);
         
         let n_tasks = ctx.shared.concurrent_tasks;
         let tim = ctx.shared.timer_regs;
@@ -191,7 +207,7 @@ mod app {
             let mut tmp: f64 = 0.0;
             for k in 0..crate::A_MATRIX_COLUMNS {
 
-                //tick(ctx.local.largest_stack);
+                tick(ctx.local.largest_stack);
 
                 tmp = tmp
                     + ctx.shared.a_matrix[i * crate::A_MATRIX_COLUMNS + k]
@@ -202,16 +218,18 @@ mod app {
         }
         
 
-        core::hint::black_box(ctx.shared.result_matrix);
+        core::hint::black_box(&ctx.shared.result_matrix);
 
         *n_tasks = *n_tasks - 1;
 
-        //tick(ctx.local.largest_stack);
+        tick(ctx.local.largest_stack);
+
 
         if *n_tasks == 0 {
             let end_time = time_us_64(tim.hi.0, tim.lo.0);
-            writeln!(usart, "{:?}", end_time-*ctx.local.start_time).ok();
-            //writeln!(usart, "{:08x}", ctx.local.largest_stack).ok();
+            //writeln!(usart, "{}", end_time-*ctx.local.start_time).ok();
+            //writeln!(usart, "{:?}", ctx.shared.result_matrix).ok();
+            writeln!(usart, "Result: {:08x}", ctx.local.largest_stack).ok();
         }
     }
 }

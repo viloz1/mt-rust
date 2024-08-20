@@ -50,10 +50,11 @@ codegen-units = 1
 debug = false
 debug-assertions = false # <-
 incremental = false
-lto = 'fat'
+lto = 'off'
 opt-level = 's' # <-
 overflow-checks = false # <-
-
+strip = true
+panic = "abort"
 # cargo test --release
 [profile.bench]
 codegen-units = 1

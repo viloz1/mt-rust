@@ -1,3 +1,4 @@
+
 #![no_main]
 #![no_std]
 #![feature(type_alias_impl_trait)]
@@ -36,7 +37,7 @@ mod app {
     use hal::dac::DacPin;
     use hal::pac::{DAC, TIM2, USART1};
     use hal::uart::Serial;
-    use md407::{hal, setup_usart, time_us_64};
+    use md407::{hal, reset, setup_usart, time_us_64};
     use hal::timer::CounterUs;
     use core::fmt::Write;
     use hal::prelude::*;
@@ -59,7 +60,7 @@ mod app {
     #[monotonic(binds = SysTick, default = true)]
     type MyMono = Systick<100000>; // 100 000 Hz / 1 us granularity
     
-    const BACKGROUND_TASKS: usize = 0;
+    const BACKGROUND_TASKS: usize = 80;
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
@@ -95,6 +96,10 @@ mod app {
         let tx_pin = gpioa.pa9.into_alternate();
         let rx_pin = gpioa.pa10.into_alternate();
         let usart1 = dp.USART1;
+
+        unsafe {
+            cortex_m::peripheral::NVIC::unmask(hal::interrupt::USART1);
+        }
 
         let mut serial = setup_usart(usart1, tx_pin, rx_pin, clocks);
 
@@ -132,7 +137,8 @@ mod app {
 
         if *peak {
             let dac2 = unsafe { &(*DAC::ptr()) };
-            dac2.dhr8r2.write(|w| unsafe { w.bits(100) });
+            dac2.dhr8r2.write(|w| unsafe { w.bits(1000) });
+
             *peak = false;
         } else {
             let dac2 = unsafe { &(*DAC::ptr()) };
@@ -154,5 +160,27 @@ mod app {
             }            
         }
         background_task::spawn_after(period).unwrap();
+    }
+
+    #[task(binds=USART1, shared = [usart, timer], priority = 2)]
+    fn handle_usart(ctx: handle_usart::Context) {
+        let usart = ctx.shared.usart;
+        let tim = ctx.shared.timer;
+        (usart, tim).lock(|usart, tim| {
+            cortex_m::peripheral::NVIC::unpend(hal::interrupt::USART1);
+            while usart.is_rx_not_empty() {
+                let read = usart.read();
+
+                if let Err(e) = read {
+                    writeln!(usart, "error {:?}", e).ok();
+                }
+
+                if let Ok(char) = read {
+                    if char == b'r' {
+                        reset(tim);
+                    }
+                }
+            }
+        })
     }
 }

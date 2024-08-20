@@ -13,3 +13,5 @@ SECTIONS {
         KEEP(*(.boot2));
     } > BOOT2
 } INSERT BEFORE .text;
+
+

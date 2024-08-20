@@ -151,7 +151,7 @@ mod app {
         
         issue_interrupt::spawn_after((1 as u64).secs()).ok();
         (button, timer, start_time).lock(|button, timer, start_time| {
-            //tick(ctx.shared.largest_stack);
+            tick(ctx.shared.largest_stack);
             *start_time = time_us_64(timer);
             cortex_m::peripheral::NVIC::pend(button.interrupt());
         });
@@ -168,7 +168,7 @@ mod app {
             time_us_64(timer)
         });
 
-        //tick(ctx.shared.largest_stack);
+        tick(ctx.shared.largest_stack);
 
         let start_time = ctx.shared.interrupt_start_time.lock(|start_time| {
             *start_time
@@ -176,11 +176,11 @@ mod app {
 
         let differnece = end_time - start_time;
         
-        //tick(ctx.shared.largest_stack);
+        tick(ctx.shared.largest_stack);
 
         ctx.shared.usart.lock(|usart| {
-            writeln!(usart, "{}, {}", differnece, end_time).ok();
-            //writeln!(usart, "{:08x}", *ctx.shared.largest_stack).ok();
+            //writeln!(usart, "{}, {}", differnece, end_time).ok();
+            writeln!(usart, "{:08x}", *ctx.shared.largest_stack).ok();
         });
         
         ctx.shared.button.lock(|button| {
